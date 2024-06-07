@@ -21,12 +21,15 @@ func (us *UserService) EmailLogin(ctx context.Context, req *types.UserEmailLogin
 
 	userInfo, exist, err := us.userDao.GetUserInfoByEmailFromDB(ctx, req.Email)
 	if err != nil {
+		glog.Slog.Error(err.Error())
 		return nil, err
 	}
 	if !exist || userInfo.Status == constants.UserStatusDeleted {
-		return nil, err
+		glog.Slog.Error(exist, " || userInfo.Status == constants.UserStatusDeleted")
+		return nil, errors.New("no exist || user was deleted")
 	}
 	if !us.verifyPassword(ctx, req.Pass, userInfo.Pass) {
+		glog.Slog.Error("verify password fail")
 		return nil, err
 	}
 	//更新最近登陆时间
@@ -43,6 +46,7 @@ func (us *UserService) EmailLogin(ctx context.Context, req *types.UserEmailLogin
 	resp.RoleID = constants.CommonRole
 	resp.AccessToken, err = utils.CreateToken(userInfo.Username, userInfo.ID, constants.CommonRole)
 	if err != nil {
+		glog.Slog.Error(err.Error())
 		return nil, err
 	}
 	return resp, nil

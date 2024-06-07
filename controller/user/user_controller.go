@@ -48,21 +48,23 @@ func (uc *UserController) UserRegisterByEmail(ctx *gin.Context) {
 
 func (uc *UserController) UserEmailLogin(ctx *gin.Context) {
 	req := &types.UserEmailLoginReq{}
-	if controller.BindAndCheck(ctx, req) {
+	if !controller.BindAndCheck(ctx, req) {
 		return
 	}
+	fmt.Println(*req)
 	//验证码是否正确
-	captchaPass, err := captcha.VerifyCaptcha(ctx, req.CaptchaID, req.CaptchaCode)
-	if err != nil || !captchaPass {
-		controller.HandleResponse(ctx, constants.CaptchaFailedCode, constants.CaptchaVerificationFailed, nil)
-		return
-	}
+	//captchaPass, err := captcha.VerifyCaptcha(ctx, req.CaptchaID, req.CaptchaCode)
+	//if err != nil || !captchaPass {
+	//	controller.HandleResponse(ctx, constants.CaptchaFailedCode, constants.CaptchaVerificationFailed, nil)
+	//	return
+	//}
 	resp, err := user.NewUserService().EmailLogin(ctx, req)
 	if err != nil {
+		fmt.Println(err.Error())
 		controller.HandleResponse(ctx, constants.InternalErrCode, constants.EmailOrPasswordWrong, nil)
 		return
 	}
-
+	fmt.Println("resp: ", resp)
 	controller.HandleResponse(ctx, constants.SuccessCode, constants.Success, resp)
 }
 
