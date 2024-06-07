@@ -83,14 +83,8 @@ type UserLoginResp struct {
 	NoticeStatus int `json:"notice_status"`
 	// follow count
 	FollowCount int `json:"follow_count"`
-	// answer count
-	AnswerCount int `json:"answer_count"`
 	// question count
 	QuestionCount int `json:"question_count"`
-	// rank
-	Rank int `json:"rank"`
-	// authority group
-	AuthorityGroup int `json:"authority_group"`
 	// display name
 	DisplayName string `json:"display_name"`
 	// avatar
@@ -115,8 +109,6 @@ type UserLoginResp struct {
 	Status string `json:"status"`
 	// user have password
 	HavePassword bool `json:"have_password"`
-	// visit token
-	VisitToken string `json:"visit_token"`
 }
 
 type UserEmailLoginReq struct {
