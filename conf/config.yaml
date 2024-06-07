@@ -1,0 +1,21 @@
+
+
+debug: false
+addr: 0.0.0.0:8081 # Project access port number
+data:
+    driver: "mysql" # Default database driver is mysql
+    # todo 数据库名字需要换一下
+    connection: "root:root@tcp(127.0.0.1:3306)/lawyer?charset=utf8mb4&parseTime=True" # MySQL database connection address
+redis:
+  addr: 127.0.0.1:6379
+  poolSize: 20
+  maxIdle:  20
+  timeout:  10
+
+email:
+  from_email : "jackzhi4716@gmail.com"
+  from_name : "jackzhi4716@gmail.com"
+  smtp_host : "smtp.gmail.com"
+  smtp_port : 465
+  smtp_password : "kjdp gbtm nbaf hqot"
+  smtp_username : "jackzhi4716@gmail.com"
