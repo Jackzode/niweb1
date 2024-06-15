@@ -1,6 +1,8 @@
 package types
 
-import "time"
+import (
+	"time"
+)
 
 type ActionRecordResp struct {
 	CaptchaID  string `json:"captcha_id"`
@@ -16,9 +18,9 @@ type UserVerifyEmailReq struct {
 }
 
 type UserRegisterReq struct {
-	Name        string `validate:"required,gt=3,lte=30" json:"name"`
+	Username    string `validate:"required,gt=3,lte=30" json:"username"`
 	Email       string `validate:"required,email,gt=0,lte=500" json:"email" `
-	Pass        string `validate:"required,gte=8,lte=32" json:"pass"`
+	Password    string `validate:"required,gte=8,lte=32" json:"password"`
 	CaptchaID   string `json:"captcha_id" `
 	CaptchaCode string `json:"captcha_code"`
 	IP          string `json:"-" `
@@ -34,14 +36,19 @@ type UserChangeEmailSendCodeReq struct {
 
 type UpdateInfoRequest struct {
 	DisplayName string `validate:"omitempty,gt=0,lte=30" form:"display_name"`
+	Description string `validate:"omitempty,gt=0,lte=4096" form:"description"`
+	School      string `validate:"omitempty,gt=0,lte=30" form:"school"`
+	Position    string `validate:"omitempty,gt=0,lte=30" form:"position"`
 	Username    string `validate:"omitempty,gt=3,lte=30" form:"username"`
 	Avatar      string `form:"avatar"`
-	Bio         string `validate:"omitempty,gt=0,lte=4096" form:"bio"`
-	BioHTML     string `form:"-"`
+	Company     string `validate:"omitempty,gt=0,lte=4096" form:"Company"`
+	Github      string `form:"github"`
 	Website     string `validate:"omitempty,gt=0,lte=500" form:"website"`
-	Location    string `validate:"omitempty,gt=0,lte=100" form:"location"`
+	CityId      string `validate:"omitempty,gt=0,lte=100" form:"city_id"`
 	UserID      string `form:"-"`
-	//IsAdmin     bool       `json:"-"`
+	FirstName   string `validate:"omitempty,gt=0,lte=100" form:"firstname"`
+	LastName    string `validate:"omitempty,gt=0,lte=100" form:"lastname"`
+	Birthday    string `validate:"omitempty,gt=0,lte=100" form:"birthday"`
 }
 
 type UserModifyPasswordReq struct {
@@ -92,28 +99,37 @@ type UserLoginResp struct {
 	// mobile
 	Mobile string `json:"mobile"`
 	// bio markdown
-	Bio string `json:"bio"`
+	Description string `json:"description"`
 	// bio html
-	BioHTML string `json:"bio_html"`
+	Company string `json:"company"`
 	// website
 	Website string `json:"website"`
 	// location
-	Location string `json:"location"`
+	CityId string `json:"city_id"`
 	// language
 	Language string `json:"language"`
 	// access token
-	AccessToken string `json:"access_token"`
+	Token string `json:"token"`
 	// role id
 	RoleID int `json:"role_id"`
 	// user status
 	Status string `json:"status"`
 	// user have password
 	HavePassword bool `json:"have_password"`
+	//school
+	School string `json:"school"`
+	//github
+	Github string `json:"github"`
+	//birthday
+	Birthday  int64  `json:"birthday"`
+	FirstName string `json:"firstname"`
+	LastName  string `json:"lastname"`
+	Position  string `json:"position"`
 }
 
 type UserEmailLoginReq struct {
 	Email       string `validate:"required,email,gt=0,lte=500" json:"email"`
-	Pass        string `validate:"required,gte=8,lte=32" json:"pass"`
+	Password    string `validate:"required,gte=8,lte=32" json:"password"`
 	CaptchaID   string `json:"captcha_id"`
 	CaptchaCode string `json:"captcha_code"`
 }
@@ -132,6 +148,7 @@ func (User) TableName() string {
 type User struct {
 	ID             string    `xorm:"not null pk autoincr BIGINT(20) id"`
 	CreatedAt      time.Time `xorm:"created TIMESTAMP created_at"`
+	Birthday       time.Time `xorm:"TIMESTAMP birthday"`
 	UpdatedAt      time.Time `xorm:"updated TIMESTAMP updated_at"`
 	SuspendedAt    time.Time `xorm:"TIMESTAMP suspended_at"`
 	DeletedAt      time.Time `xorm:"TIMESTAMP deleted_at"`
@@ -150,13 +167,17 @@ type User struct {
 	DisplayName    string    `xorm:"not null default '' VARCHAR(30) display_name"`
 	Avatar         string    `xorm:"not null default '' VARCHAR(1024) avatar"`
 	Mobile         string    `xorm:"not null VARCHAR(20) mobile"`
-	Bio            string    `xorm:"not null TEXT bio"`
-	BioHTML        string    `xorm:"not null TEXT bio_html"`
+	Description    string    `xorm:"not null TEXT description"`
+	Company        string    `xorm:"not null TEXT company"`
 	Website        string    `xorm:"not null default '' VARCHAR(255) website"`
-	Location       string    `xorm:"not null default '' VARCHAR(100) location"`
+	CityId         string    `xorm:"not null default '' INT(11) city_id"`
 	IPInfo         string    `xorm:"not null default '' VARCHAR(255) ip_info"`
-	IsAdmin        bool      `xorm:"not null default false BOOL is_admin"`
+	School         string    `xorm:"school"`
 	Language       string    `xorm:"not null default '' VARCHAR(100) language"`
+	Position       string    `xorm:"not null default '' VARCHAR(100) position"`
+	Github         string    `xorm:"not null default '' VARCHAR(100) github"`
+	Firstname      string    `xorm:"VARCHAR(100) firstname"`
+	Lastname       string    `xorm:"VARCHAR(100) lastname"`
 }
 
 type GetOtherUserInfoByUsername struct {
@@ -190,7 +211,7 @@ type GetOtherUserInfoByUsername struct {
 	// website
 	Website string `json:"website"`
 	// location
-	Location  string `json:"location"`
+	CityId    string `json:"city_id"`
 	Status    string `json:"status"`
 	StatusMsg string `json:"status_msg,omitempty"`
 }
@@ -202,6 +223,6 @@ type UserBasicInfo struct {
 	DisplayName string `json:"display_name"`
 	Avatar      string `json:"avatar"`
 	Website     string `json:"website"`
-	Location    string `json:"location"`
+	CityId      string `json:"city_id"`
 	Status      string `json:"status"`
 }

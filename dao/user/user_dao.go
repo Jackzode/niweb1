@@ -2,8 +2,11 @@ package user
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"github.com/Jackzode/painting/commons/constants"
 	"github.com/Jackzode/painting/commons/handler"
+	glog "github.com/Jackzode/painting/commons/logger"
 	"github.com/Jackzode/painting/commons/types"
 	"github.com/redis/go-redis/v9"
 	"strings"
@@ -25,6 +28,11 @@ func NewUserDao() *UserDao {
 	}
 }
 
+func (ur *UserDao) UpdateUserAvatar(ctx context.Context, uid, url string) (err error) {
+	_, err = ur.DB.Context(ctx).ID(uid).Cols("avatar").Update(&types.User{Avatar: url})
+	return err
+}
+
 // AddUser add user
 func (ur *UserDao) AddUser(ctx context.Context, user *types.User) (err error) {
 
@@ -37,7 +45,7 @@ func (ur *UserDao) AddUser(ctx context.Context, user *types.User) (err error) {
 				return nil, err
 			}
 			if exist {
-				return nil, err
+				return nil, errors.New(constants.EmailDuplicate)
 			}
 			_, err = session.Insert(user)
 			if err != nil {
@@ -113,8 +121,6 @@ func (ur *UserDao) UpdatePass(ctx context.Context, userID, pass string) error {
 
 func (ur *UserDao) UpdateEmail(ctx context.Context, userID, email string) (err error) {
 	_, err = ur.DB.Context(ctx).Where("id = ?", userID).Update(&types.User{EMail: email})
-	if err != nil {
-	}
 	return
 }
 
@@ -128,10 +134,10 @@ func (ur *UserDao) UpdateLanguage(ctx context.Context, userID, language string) 
 	return
 }
 
-// UpdateInfo update user info
+// UpdateInfo update user info  todo except avatar
 func (ur *UserDao) UpdateInfo(ctx context.Context, userInfo *types.User) (err error) {
 	_, err = ur.DB.Context(ctx).Where("id = ?", userInfo.ID).
-		Cols("username", "display_name", "avatar", "bio", "bio_html", "website", "location").Update(userInfo)
+		Cols("username", "display_name", "description", "school", "website", "city_id", "company", "firstname", "lastname", "position", "birthday", "github").Update(userInfo)
 	return
 }
 
@@ -158,6 +164,23 @@ func (ur *UserDao) BatchGetUserByID(ctx context.Context, ids []string) ([]*types
 	}
 	//tryToDecorateUserListFromUserCenter(ctx, ur.DB, list)
 	return list, nil
+}
+
+func (ur *UserDao) CheckUsernameValid(ctx context.Context, username string) bool {
+	res := ur.Cache.SetNX(ctx, username, 1, 0)
+	if res.Err() != nil {
+		glog.Slog.Error(res.Err().Error())
+	}
+	return res.Val()
+}
+
+func (ur *UserDao) CheckEmailValid(ctx context.Context, email string) bool {
+	res := ur.Cache.SetNX(ctx, email, 1, 0)
+	fmt.Println("setnx---", res.Err(), res.Val())
+	if res.Err() != nil {
+		glog.Slog.Error(res.Err().Error())
+	}
+	return res.Val()
 }
 
 func (ur *UserDao) GetUserInfoByUsername(ctx context.Context, username string) (userInfo *types.User, exist bool, err error) {

@@ -11,9 +11,11 @@ import (
 	"github.com/Jackzode/painting/commons/types"
 	"github.com/Jackzode/painting/commons/utils"
 	"github.com/Jackzode/painting/service/captcha"
+	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 	"github.com/google/uuid"
 	"github.com/jinzhu/copier"
 	"golang.org/x/crypto/bcrypt"
+	"io"
 	"time"
 )
 
@@ -28,7 +30,7 @@ func (us *UserService) EmailLogin(ctx context.Context, req *types.UserEmailLogin
 		glog.Slog.Error(exist, " || userInfo.Status == constants.UserStatusDeleted")
 		return nil, errors.New("no exist || user was deleted")
 	}
-	if !us.verifyPassword(ctx, req.Pass, userInfo.Pass) {
+	if !us.verifyPassword(ctx, req.Password, userInfo.Pass) {
 		glog.Slog.Error("verify password fail")
 		return nil, err
 	}
@@ -44,7 +46,8 @@ func (us *UserService) EmailLogin(ctx context.Context, req *types.UserEmailLogin
 	resp.Status = utils.ConvertUserStatus(userInfo.Status, userInfo.MailStatus)
 	resp.HavePassword = len(userInfo.Pass) > 0
 	resp.RoleID = constants.CommonRole
-	resp.AccessToken, err = utils.CreateToken(userInfo.Username, userInfo.ID, constants.CommonRole)
+	resp.Avatar = userInfo.Avatar
+	resp.Token, err = utils.CreateToken(userInfo.Username, userInfo.ID, constants.CommonRole)
 	if err != nil {
 		glog.Slog.Error(err.Error())
 		return nil, err
@@ -149,6 +152,7 @@ func (us *UserService) UpdateInfo(ctx context.Context, req *types.UpdateInfoRequ
 		}
 		userInfo, exist, err := us.userDao.GetUserInfoByUsername(ctx, req.Username)
 		if err != nil {
+			glog.Slog.Error(err.Error())
 			return err
 		}
 		if exist && userInfo.ID != req.UserID {
@@ -158,6 +162,7 @@ func (us *UserService) UpdateInfo(ctx context.Context, req *types.UpdateInfoRequ
 
 	oldUserInfo, exist, err := us.userDao.GetByUserID(ctx, req.UserID)
 	if err != nil {
+		glog.Slog.Error(err.Error())
 		return err
 	}
 	if !exist {
@@ -171,32 +176,30 @@ func (us *UserService) UpdateInfo(ctx context.Context, req *types.UpdateInfoRequ
 
 func (us *UserService) formatUserInfoForUpdateInfo(
 	oldUserInfo *types.User, req *types.UpdateInfoRequest) *types.User {
-	avatar, _ := json.Marshal(req.Avatar)
-
-	userInfo := &types.User{}
-	userInfo.DisplayName = oldUserInfo.DisplayName
-	userInfo.Username = oldUserInfo.Username
-	userInfo.Avatar = oldUserInfo.Avatar
-	userInfo.Bio = oldUserInfo.Bio
-	userInfo.BioHTML = oldUserInfo.BioHTML
-	userInfo.Website = oldUserInfo.Website
-	userInfo.Location = oldUserInfo.Location
-	userInfo.ID = req.UserID
-
-	if len(req.DisplayName) > 0 {
-		userInfo.DisplayName = req.DisplayName
+	birthday, err := time.Parse("2006-01-02", req.Birthday)
+	if err != nil {
+		glog.Slog.Error(err.Error())
 	}
-	if len(req.Username) > 0 {
-		userInfo.Username = req.Username
+	oldUserInfo.Birthday = birthday
+	oldUserInfo.Firstname = req.FirstName
+	oldUserInfo.Lastname = req.LastName
+	oldUserInfo.Github = req.Github
+	oldUserInfo.Position = req.Position
+	oldUserInfo.DisplayName = req.DisplayName
+	oldUserInfo.Username = req.Username
+	//todo
+	if len(req.Avatar) > 5 {
+		oldUserInfo.Avatar = req.Avatar
 	}
-	if len(avatar) > 0 {
-		userInfo.Avatar = string(avatar)
-	}
-	userInfo.Bio = req.Bio
-	userInfo.BioHTML = req.BioHTML
-	userInfo.Website = req.Website
-	userInfo.Location = req.Location
-	return userInfo
+	oldUserInfo.Company = req.Company
+	oldUserInfo.Website = req.Website
+	oldUserInfo.CityId = req.CityId
+	oldUserInfo.ID = req.UserID
+	oldUserInfo.Description = req.Description
+	oldUserInfo.School = req.School
+	oldUserInfo.Website = req.Website
+	oldUserInfo.CityId = req.CityId
+	return oldUserInfo
 }
 
 // UserUpdateInterface update user interface
@@ -212,23 +215,20 @@ func (us *UserService) UserUpdateInterface(ctx context.Context, lang, uid string
 // UserRegisterByEmail user register
 func (us *UserService) UserRegisterByEmail(ctx context.Context, req *types.UserRegisterReq) (resp *types.UserLoginResp, err error) {
 	//先查一下数据库是否有这个邮箱地址，有则是重复注册
-	_, has, err := us.userDao.GetUserInfoByEmailFromDB(ctx, req.Email)
-	if err != nil {
-		return nil, err
-	}
+	//_, has, err := us.userDao.GetUserInfoByEmailFromDB(ctx, req.Email)
+	valid := us.userDao.CheckEmailValid(ctx, req.Email)
 	//邮箱重复了
-	if has {
+	if !valid {
 		return nil, errors.New(constants.EmailDuplicate)
 	}
-
 	userInfo := &types.User{}
 	userInfo.EMail = req.Email
-	userInfo.DisplayName = req.Name
-	userInfo.Pass, err = utils.EncryptPassword(req.Pass)
+	userInfo.DisplayName = req.Username
+	userInfo.Pass, err = utils.EncryptPassword(req.Password)
 	if err != nil {
 		return nil, err
 	}
-	userInfo.Username, err = us.MakeUsername(ctx, req.Name)
+	userInfo.Username, err = us.MakeUsername(ctx, req.Username)
 	if err != nil {
 		return nil, err
 	}
@@ -237,9 +237,11 @@ func (us *UserService) UserRegisterByEmail(ctx context.Context, req *types.UserR
 	userInfo.Status = constants.UserStatusAvailable
 	userInfo.LastLoginDate = time.Now()
 	userInfo.IPInfo = req.IP
+	userInfo.Avatar = constants.DefaultAvatar
 	//userInfo.ID是插入mysql生成的
 	err = us.userDao.AddUser(ctx, userInfo)
 	if err != nil {
+		glog.Slog.Error(err.Error())
 		return nil, err
 	}
 
@@ -250,7 +252,7 @@ func (us *UserService) UserRegisterByEmail(ctx context.Context, req *types.UserR
 	}
 	code := uuid.NewString()
 	go captcha.SetCode(ctx, code, utils.JsonObj2String(data), constants.CaptchaExpiration)
-	body := fmt.Sprintf("http://localhost:8081/user/email/verification?code=%s", code)
+	body := fmt.Sprintf("http://localhost:8081/email/verification?code=%s", code)
 	go handler.EmailHandler.Send(userInfo.EMail, constants.TitleRegisterByEmail, body)
 
 	// return user info and token
@@ -261,7 +263,8 @@ func (us *UserService) UserRegisterByEmail(ctx context.Context, req *types.UserR
 	resp.Status = utils.ConvertUserStatus(userInfo.Status, userInfo.MailStatus)
 	resp.HavePassword = len(userInfo.Pass) > 0
 	resp.RoleID = constants.CommonRole
-	resp.AccessToken, err = utils.CreateToken(userInfo.Username, userInfo.ID, resp.RoleID)
+	resp.Avatar = constants.DefaultAvatar
+	resp.Token, err = utils.CreateToken(userInfo.Username, userInfo.ID, resp.RoleID)
 	if err != nil {
 		return nil, err
 	}
@@ -318,7 +321,7 @@ func (us *UserService) UserVerifyEmail(ctx context.Context, req *types.UserVerif
 
 	resp = &types.UserLoginResp{}
 	_ = copier.Copy(resp, userInfo)
-	resp.AccessToken = AccessToken
+	resp.Token = AccessToken
 	resp.CreatedAt = userInfo.CreatedAt.Unix()
 	resp.LastLoginDate = userInfo.LastLoginDate.Unix()
 	resp.Status = utils.ConvertUserStatus(userInfo.Status, userInfo.MailStatus)
@@ -414,10 +417,28 @@ func (us *UserService) UserChangeEmailVerify(ctx context.Context, content string
 	resp.HavePassword = len(userInfo.Pass) > 0
 	resp.Avatar = userInfo.Avatar
 	//todo 如何作废之前的token？是个问题
-	resp.AccessToken, err = utils.CreateToken(resp.Username, resp.ID, roleID)
+	resp.Token, err = utils.CreateToken(resp.Username, resp.ID, roleID)
 	if err != nil {
 		return nil, err
 	}
 	resp.RoleID = roleID
 	return resp, nil
+}
+
+func (us *UserService) Upload2OSS(filekey string, file io.Reader) (imageUrl string, err error) {
+
+	client, err := oss.New("yourEndpoint", "", "")
+	if err != nil {
+		return "", err
+	}
+
+	// 获取存储空间。
+	bucket, err := client.Bucket("bucketName")
+	if err != nil {
+		return "", err
+	}
+	// 上传文件。
+	err = bucket.PutObject(filekey, file)
+
+	return "", err
 }

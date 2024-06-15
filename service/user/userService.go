@@ -2,13 +2,14 @@ package user
 
 import (
 	"context"
-	"github.com/Chain-Zhang/pinyin"
+	"errors"
 	"github.com/Jackzode/painting/commons/constants"
+	glog "github.com/Jackzode/painting/commons/logger"
 	"github.com/Jackzode/painting/commons/types"
 	"github.com/Jackzode/painting/commons/utils"
 	"github.com/Jackzode/painting/dao/user"
+	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
-	"strings"
 )
 
 type UserService struct {
@@ -137,7 +138,7 @@ func (us *UserService) FormatUserBasicInfo(ctx context.Context, userInfo *types.
 	userBasicInfo.Rank = userInfo.Rank
 	userBasicInfo.DisplayName = userInfo.DisplayName
 	userBasicInfo.Website = userInfo.Website
-	userBasicInfo.Location = userInfo.Location
+	userBasicInfo.CityId = userInfo.CityId
 	userBasicInfo.Avatar = userInfo.Avatar
 	userBasicInfo.Status = utils.ConvertUserStatus(userInfo.Status, userInfo.MailStatus)
 	if userBasicInfo.Status == constants.UserDeleted {
@@ -150,39 +151,43 @@ func (us *UserService) FormatUserBasicInfo(ctx context.Context, userInfo *types.
 // MakeUsername
 // Generate a unique Username based on the displayName
 func (us *UserService) MakeUsername(ctx context.Context, displayName string) (username string, err error) {
-	// Chinese processing
-	if has := utils.IsChinese(displayName); has {
-		str, err := pinyin.New(displayName).Split("").Mode(pinyin.WithoutTone).Convert()
-		if err != nil {
-			return "", err
-		} else {
-			displayName = str
-		}
-	}
+	//// Chinese processing
+	//if has := utils.IsChinese(displayName); has {
+	//	str, err := pinyin.New(displayName).Split("").Mode(pinyin.WithoutTone).Convert()
+	//	if err != nil {
+	//		return "", err
+	//	} else {
+	//		displayName = str
+	//	}
+	//}
+	//
+	//username = strings.ReplaceAll(displayName, " ", "-")
+	//username = strings.ToLower(username)
+	//suffix := ""
 
-	username = strings.ReplaceAll(displayName, " ", "-")
-	username = strings.ToLower(username)
-	suffix := ""
-
-	if utils.IsInvalidUsername(username) {
+	if utils.IsInvalidUsername(displayName) {
 		return "", err
+	}
+	valid := us.userDao.CheckUsernameValid(ctx, displayName)
+	if !valid {
+		return "", errors.New("username invalid")
 	}
 	//todo
 	//if utils.IsReservedUsername(username) {
 	//	return "", err
 	//}
 
-	for {
-		_, has, err := us.userDao.GetUserInfoByUsername(ctx, username+suffix)
-		if err != nil {
-			return "", err
-		}
-		if !has {
-			break
-		}
-		suffix = utils.UsernameSuffix()
-	}
-	return username + suffix, nil
+	//for {
+	//	_, has, err := us.userDao.GetUserInfoByUsername(ctx, username+suffix)
+	//	if err != nil {
+	//		return "", err
+	//	}
+	//	if !has {
+	//		break
+	//	}
+	//	suffix = utils.UsernameSuffix()
+	//}
+	return displayName, nil
 }
 
 func (us *UserService) GetUserInfoByUserID(ctx context.Context, userID string) (
@@ -190,16 +195,23 @@ func (us *UserService) GetUserInfoByUserID(ctx context.Context, userID string) (
 
 	userInfo, exist, err := us.userDao.GetByUserID(ctx, userID)
 	if err != nil {
+		glog.Slog.Error(err.Error())
 		return nil, err
 	}
 	if !exist {
-		return nil, err
+		glog.Slog.Error("userID: ", userID, "not found")
+		return nil, errors.New(constants.UserNotFound)
 	}
 	if userInfo.Status == constants.UserStatusDeleted {
-		return nil, err
+		glog.Slog.Error("userID: ", userID, "not found")
+		return nil, errors.New(constants.UserDeleted)
 	}
 	return userInfo, nil
 
+}
+
+func (us *UserService) UploadUserAvatar(ctx *gin.Context, uid string, url string) error {
+	return us.userDao.UpdateUserAvatar(ctx, uid, url)
 }
 
 /*
