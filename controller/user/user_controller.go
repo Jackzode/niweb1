@@ -11,6 +11,8 @@ import (
 	"github.com/Jackzode/painting/service/user"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
+	"path/filepath"
+	"time"
 )
 
 // UserController user controller, no need login
@@ -26,7 +28,7 @@ func NewUserController() *UserController {
 
 func (uc *UserController) UserRegisterByEmail(ctx *gin.Context) {
 	req := &types.UserRegisterReq{}
-	if !controller.BindAndCheck(ctx, req) {
+	if !controller.BindAndCheckParams(ctx, req) {
 		return
 	}
 	req.IP = ctx.ClientIP()
@@ -48,10 +50,9 @@ func (uc *UserController) UserRegisterByEmail(ctx *gin.Context) {
 
 func (uc *UserController) UserEmailLogin(ctx *gin.Context) {
 	req := &types.UserEmailLoginReq{}
-	if !controller.BindAndCheck(ctx, req) {
+	if !controller.BindAndCheckParams(ctx, req) {
 		return
 	}
-	fmt.Println(*req)
 	//验证码是否正确
 	//captchaPass, err := captcha.VerifyCaptcha(ctx, req.CaptchaID, req.CaptchaCode)
 	//if err != nil || !captchaPass {
@@ -60,11 +61,9 @@ func (uc *UserController) UserEmailLogin(ctx *gin.Context) {
 	//}
 	resp, err := user.NewUserService().EmailLogin(ctx, req)
 	if err != nil {
-		fmt.Println(err.Error())
 		controller.HandleResponse(ctx, constants.InternalErrCode, constants.EmailOrPasswordWrong, nil)
 		return
 	}
-	fmt.Println("resp: ", resp)
 	controller.HandleResponse(ctx, constants.SuccessCode, constants.Success, resp)
 }
 
@@ -74,7 +73,7 @@ func (uc *UserController) GetUserInfoByUserID(ctx *gin.Context) {
 	userInfo, err := uc.userService.GetUserInfoByUserID(ctx, uid)
 	if err != nil {
 		glog.Slog.Error(err)
-		controller.HandleResponse(ctx, constants.InternalErrCode, constants.EmailOrPasswordWrong, nil)
+		controller.HandleResponse(ctx, constants.InternalErrCode, constants.InternalErrMsg, nil)
 		return
 	}
 	resp := &types.UserLoginResp{}
@@ -83,12 +82,14 @@ func (uc *UserController) GetUserInfoByUserID(ctx *gin.Context) {
 	resp.LastLoginDate = userInfo.LastLoginDate.Unix()
 	resp.Status = utils.ConvertUserStatus(userInfo.Status, userInfo.MailStatus)
 	resp.HavePassword = len(userInfo.Pass) > 0
+	resp.Avatar = userInfo.Avatar
+	resp.Birthday = userInfo.Birthday.Unix()
 	controller.HandleResponse(ctx, constants.SuccessCode, constants.Success, resp)
 }
 
 func (uc *UserController) GetOtherUserInfoByUsername(ctx *gin.Context) {
 	req := &types.GetOtherUserInfoByUsernameReq{}
-	if controller.BindAndCheck(ctx, req) {
+	if !controller.BindAndCheckParams(ctx, req) {
 		return
 	}
 	//核心逻辑
@@ -101,7 +102,7 @@ func (uc *UserController) GetOtherUserInfoByUsername(ctx *gin.Context) {
 
 func (uc *UserController) RetrievePassWord(ctx *gin.Context) {
 	req := &types.UserRetrievePassWordRequest{}
-	if controller.BindAndCheck(ctx, req) {
+	if !controller.BindAndCheckParams(ctx, req) {
 		return
 	}
 	//校对验证码
@@ -120,7 +121,7 @@ func (uc *UserController) RetrievePassWord(ctx *gin.Context) {
 
 func (uc *UserController) UserReplacePassWord(ctx *gin.Context) {
 	req := &types.UserRePassWordRequest{}
-	if controller.BindAndCheck(ctx, req) {
+	if !controller.BindAndCheckParams(ctx, req) {
 		return
 	}
 	//这个code是/password/reset接口生成的，里面存的是email和uid
@@ -140,7 +141,7 @@ func (uc *UserController) UserReplacePassWord(ctx *gin.Context) {
 
 func (uc *UserController) UserVerifyEmail(ctx *gin.Context) {
 	req := &types.UserVerifyEmailReq{}
-	if controller.BindAndCheck(ctx, req) {
+	if !controller.BindAndCheckParams(ctx, req) {
 		return
 	}
 	//VerifyEmailByCode 根据code从缓存中获取content,包含email和uid
@@ -161,7 +162,7 @@ func (uc *UserController) UserVerifyEmail(ctx *gin.Context) {
 func (uc *UserController) UserVerifyEmailSend(ctx *gin.Context) {
 	req := &types.UserVerifyEmailReq{}
 	//todo  content need verify
-	if !controller.BindAndCheck(ctx, req) {
+	if !controller.BindAndCheckParams(ctx, req) {
 		return
 	}
 	uid := utils.GetUidFromTokenByCtx(ctx)
@@ -181,7 +182,7 @@ func (uc *UserController) UserVerifyEmailSend(ctx *gin.Context) {
 func (uc *UserController) UserModifyPassWord(ctx *gin.Context) {
 	req := &types.UserModifyPasswordReq{}
 	fmt.Println("req ", req)
-	if controller.BindAndCheck(ctx, req) {
+	if !controller.BindAndCheckParams(ctx, req) {
 		return
 	}
 	uid := utils.GetUidFromTokenByCtx(ctx)
@@ -212,11 +213,13 @@ func (uc *UserController) UserModifyPassWord(ctx *gin.Context) {
 	controller.HandleResponse(ctx, constants.SuccessCode, constants.Success, nil)
 }
 
-func (uc *UserController) UserUpdateInfo(ctx *gin.Context) {
+func (uc *UserController) UpdateUserInfo(ctx *gin.Context) {
+
 	req := &types.UpdateInfoRequest{}
-	if controller.BindAndCheck(ctx, req) {
+	if !controller.BindAndCheckParams(ctx, req) {
 		return
 	}
+	fmt.Printf("req: %+v \n", *req)
 	//从token里获取用户信息
 	req.UserID = utils.GetUidFromTokenByCtx(ctx)
 	err := uc.userService.UpdateInfo(ctx, req)
@@ -229,7 +232,7 @@ func (uc *UserController) UserUpdateInfo(ctx *gin.Context) {
 
 func (uc *UserController) UserUpdateInterfaceLang(ctx *gin.Context) {
 	//req := &types.UpdateUserInterfaceRequest{}
-	//if controller.BindAndCheck(ctx, req) {
+	//if controller.BindAndCheckParams(ctx, req) {
 	//	return
 	//}
 	////req.UserId = middleware.GetLoginUserIDFromContext(ctx)
@@ -245,7 +248,7 @@ func (uc *UserController) UserUpdateInterfaceLang(ctx *gin.Context) {
 
 func (uc *UserController) ActionRecord(ctx *gin.Context) {
 	//req := &types.ActionRecordReq{}
-	//if controller.BindAndCheck(ctx, req) {
+	//if controller.BindAndCheckParams(ctx, req) {
 	//	return
 	//}
 	//uid := utils.GetUidFromTokenByCtx(ctx)
@@ -291,7 +294,7 @@ func (uc *UserController) GetUserNotificationConfig(ctx *gin.Context) {
 // todo @Router /answer/api/v1/user/notification/config [put]
 func (uc *UserController) UpdateUserNotificationConfig(ctx *gin.Context) {
 	//req := &types.UpdateUserNotificationConfigReq{}
-	//if controller.BindAndCheck(ctx, req) {
+	//if controller.BindAndCheckParams(ctx, req) {
 	//	return
 	//}
 	//
@@ -303,7 +306,7 @@ func (uc *UserController) UpdateUserNotificationConfig(ctx *gin.Context) {
 
 func (uc *UserController) UserChangeEmailSendCode(ctx *gin.Context) {
 	req := &types.UserChangeEmailSendCodeReq{}
-	if controller.BindAndCheck(ctx, req) {
+	if !controller.BindAndCheckParams(ctx, req) {
 		return
 	}
 	req.UserID = utils.GetUidFromTokenByCtx(ctx)
@@ -333,7 +336,7 @@ func (uc *UserController) UserChangeEmailSendCode(ctx *gin.Context) {
 
 func (uc *UserController) UserChangeEmailVerify(ctx *gin.Context) {
 	//req := &types.UserChangeEmailVerifyReq{}
-	//if controller.BindAndCheck(ctx, req) {
+	//if controller.BindAndCheckParams(ctx, req) {
 	//	return
 	//}
 	//req.Content = service.EmailServicer.VerifyEmailByCode(ctx, req.Code)
@@ -354,7 +357,7 @@ func (uc *UserController) UserChangeEmailVerify(ctx *gin.Context) {
 
 //func (uc *UserController) UserUnsubscribeNotification(ctx *gin.Context) {
 //	req := &types.UserUnsubscribeNotificationReq{}
-//	if controller.BindAndCheck(ctx, req) {
+//	if controller.BindAndCheckParams(ctx, req) {
 //		return
 //	}
 //
@@ -370,7 +373,7 @@ func (uc *UserController) UserChangeEmailVerify(ctx *gin.Context) {
 
 func (uc *UserController) SearchUserListByName(ctx *gin.Context) {
 	req := &types.GetOtherUserInfoByUsernameReq{}
-	if controller.BindAndCheck(ctx, req) {
+	if !controller.BindAndCheckParams(ctx, req) {
 		return
 	}
 	resp, err := uc.userService.SearchUserListByName(ctx, req)
@@ -378,5 +381,54 @@ func (uc *UserController) SearchUserListByName(ctx *gin.Context) {
 		controller.HandleResponse(ctx, constants.InternalErrCode, constants.EmailOrPasswordWrong, nil)
 		return
 	}
+	controller.HandleResponse(ctx, constants.SuccessCode, constants.Success, resp)
+}
+
+func (uc *UserController) UploadAvatar(ctx *gin.Context) {
+
+	UserID := utils.GetUidFromTokenByCtx(ctx)
+	if UserID == "" {
+		controller.HandleResponse(ctx, constants.ParamInvalid, constants.UserTokenInvalid, nil)
+		return
+	}
+	file, err := ctx.FormFile("file")
+	if err != nil {
+		glog.Slog.Error(err.Error())
+		controller.HandleResponse(ctx, constants.ParamInvalid, constants.UploadError, nil)
+		return
+	}
+
+	fileExt := filepath.Ext(file.Filename)
+	allowExt := map[string]bool{".jpg": true, ".png": true, ".jpeg": true}
+	if !allowExt[fileExt] {
+		controller.HandleResponse(ctx, constants.ParamInvalid, constants.FileTypeErr, nil)
+		return
+	}
+
+	now := time.Now()
+	//文件存放路径
+	fileKey := fmt.Sprintf("avatar/%s%s", now.Format("20060102"), file.Filename)
+	fileContent, err := file.Open()
+	defer fileContent.Close()
+	if err != nil {
+		glog.Slog.Error(err.Error())
+		controller.HandleResponse(ctx, constants.InternalErrCode, constants.UploadError, nil)
+		return
+	}
+
+	url, err := uc.userService.Upload2OSS(fileKey, fileContent)
+	if err != nil {
+		glog.Slog.Error(err.Error())
+		controller.HandleResponse(ctx, constants.InternalErrCode, constants.UploadError, nil)
+		return
+	}
+	//update mysql avatar
+	err = uc.userService.UploadUserAvatar(ctx, UserID, url)
+	if err != nil {
+		glog.Slog.Error(err.Error())
+		controller.HandleResponse(ctx, constants.InternalErrCode, constants.UploadError, nil)
+		return
+	}
+	resp := map[string]string{"image_url": url}
 	controller.HandleResponse(ctx, constants.SuccessCode, constants.Success, resp)
 }

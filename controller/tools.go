@@ -8,11 +8,11 @@ import (
 	"net/http"
 )
 
-func BindAndCheck(ctx *gin.Context, data interface{}) bool {
+func BindAndCheckParams(ctx *gin.Context, data interface{}) bool {
 	lang := utils.GetLang(ctx)
 	ctx.Set(constants.AcceptLanguageFlag, lang)
 	if err := ctx.ShouldBind(data); err != nil {
-		glog.Slog.Errorf("http_handle BindAndCheck fail, %s", err.Error())
+		glog.Slog.Errorf("http_handle BindAndCheckParams fail, %s", err.Error())
 		HandleResponse(ctx, constants.ParamInvalid, err.Error(), nil)
 		return false
 	}

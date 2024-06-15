@@ -8,6 +8,8 @@ const (
 	StatusErrCode               = 10002
 	CaptchaFailedCode           = 10001
 	ParamInvalid                = 10000
+	FileTypeErr                 = "file type error"
+	UploadError                 = "No file is received"
 	AcceptLanguageFlag          = "Accept-Language"
 	CaptchaExpiration           = 5 * time.Minute
 	TitleRetrievePassWord       = "RetrievePassWord"
@@ -36,4 +38,5 @@ const (
 	EmailStatusAvailable    = 1
 	EmailStatusToBeVerified = 2
 	DefaultLanguage         = "en-US"
+	DefaultAvatar           = "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Brad_Pitt_2019_by_Glenn_Francis.jpg/1024px-Brad_Pitt_2019_by_Glenn_Francis.jpg"
 )
