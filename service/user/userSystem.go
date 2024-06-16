@@ -427,8 +427,6 @@ func (us *UserService) UserChangeEmailVerify(ctx context.Context, content string
 
 func (us *UserService) Upload2OSS(filekey string, file io.Reader) (err error) {
 
-	//LTAI5tGEoN6fhw3R3zA5TgYm
-	//e4dH2MwbtRKVWxfCB10FrZAlJb2huH
 	client, err := oss.New("oss-us-west-1.aliyuncs.com", "LTAI5tGEoN6fhw3R3zA5TgYm", "e4dH2MwbtRKVWxfCB10FrZAlJb2huH")
 	if err != nil {
 		return err
