@@ -425,20 +425,21 @@ func (us *UserService) UserChangeEmailVerify(ctx context.Context, content string
 	return resp, nil
 }
 
-func (us *UserService) Upload2OSS(filekey string, file io.Reader) (imageUrl string, err error) {
+func (us *UserService) Upload2OSS(filekey string, file io.Reader) (err error) {
 
-	client, err := oss.New("yourEndpoint", "", "")
+	//LTAI5tGEoN6fhw3R3zA5TgYm
+	//e4dH2MwbtRKVWxfCB10FrZAlJb2huH
+	client, err := oss.New("oss-us-west-1.aliyuncs.com", "LTAI5tGEoN6fhw3R3zA5TgYm", "e4dH2MwbtRKVWxfCB10FrZAlJb2huH")
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	// 获取存储空间。
-	bucket, err := client.Bucket("bucketName")
+	bucket, err := client.Bucket("lawyer-niweb1a")
 	if err != nil {
-		return "", err
+		return err
 	}
 	// 上传文件。
 	err = bucket.PutObject(filekey, file)
-
-	return "", err
+	return err
 }

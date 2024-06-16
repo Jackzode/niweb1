@@ -44,7 +44,7 @@ type UpdateInfoRequest struct {
 	Company     string `validate:"omitempty,gt=0,lte=4096" form:"Company"`
 	Github      string `form:"github"`
 	Website     string `validate:"omitempty,gt=0,lte=500" form:"website"`
-	CityId      string `validate:"omitempty,gt=0,lte=100" form:"city_id"`
+	CityId      string `validate:"omitempty" form:"cityId"`
 	UserID      string `form:"-"`
 	FirstName   string `validate:"omitempty,gt=0,lte=100" form:"firstname"`
 	LastName    string `validate:"omitempty,gt=0,lte=100" form:"lastname"`

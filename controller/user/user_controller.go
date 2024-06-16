@@ -405,9 +405,11 @@ func (uc *UserController) UploadAvatar(ctx *gin.Context) {
 		return
 	}
 
-	now := time.Now()
-	//文件存放路径
-	fileKey := fmt.Sprintf("avatar/%s%s", now.Format("20060102"), file.Filename)
+	now := time.Now().Unix()
+	//文件存放路径 //https://lawyer-niweb1a.oss-us-west-1.aliyuncs.com/avatar/20240616Screenshot%202024-06-10%20at%209.09.04%20PM.png
+	fileKey := fmt.Sprintf("avatar/%v%s", now, file.Filename)
+	bucketHost := "https://lawyer-niweb1a.oss-us-west-1.aliyuncs.com/"
+	url := bucketHost + fileKey
 	fileContent, err := file.Open()
 	defer fileContent.Close()
 	if err != nil {
@@ -416,7 +418,7 @@ func (uc *UserController) UploadAvatar(ctx *gin.Context) {
 		return
 	}
 
-	url, err := uc.userService.Upload2OSS(fileKey, fileContent)
+	err = uc.userService.Upload2OSS(fileKey, fileContent)
 	if err != nil {
 		glog.Slog.Error(err.Error())
 		controller.HandleResponse(ctx, constants.InternalErrCode, constants.UploadError, nil)
@@ -429,6 +431,8 @@ func (uc *UserController) UploadAvatar(ctx *gin.Context) {
 		controller.HandleResponse(ctx, constants.InternalErrCode, constants.UploadError, nil)
 		return
 	}
+
 	resp := map[string]string{"image_url": url}
+	fmt.Println("resp=", resp)
 	controller.HandleResponse(ctx, constants.SuccessCode, constants.Success, resp)
 }
