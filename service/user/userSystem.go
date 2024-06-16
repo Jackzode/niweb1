@@ -440,4 +440,5 @@ func (us *UserService) Upload2OSS(filekey string, file io.Reader) (err error) {
 	// 上传文件。
 	err = bucket.PutObject(filekey, file)
 	return err
+
 }

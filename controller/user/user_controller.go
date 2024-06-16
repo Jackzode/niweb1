@@ -431,7 +431,6 @@ func (uc *UserController) UploadAvatar(ctx *gin.Context) {
 		controller.HandleResponse(ctx, constants.InternalErrCode, constants.UploadError, nil)
 		return
 	}
-
 	resp := map[string]string{"image_url": url}
 	fmt.Println("resp=", resp)
 	controller.HandleResponse(ctx, constants.SuccessCode, constants.Success, resp)
