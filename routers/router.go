@@ -21,6 +21,8 @@ func NewHTTPServer(debug bool) *gin.Engine {
 	group := r.Group("/painting", middleware.InOutLog())
 	InitUserRoutes(group)
 
+	InitPostRoutes(group)
+
 	return r
 }
 

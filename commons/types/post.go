@@ -4,13 +4,6 @@ import (
 	"time"
 )
 
-const (
-	QuestionOperationPin   = "pin"
-	QuestionOperationUnPin = "unpin"
-	QuestionOperationHide  = "hide"
-	QuestionOperationShow  = "show"
-)
-
 // RemoveQuestionReq delete question request
 type RemoveQuestionReq struct {
 	// question id
@@ -54,25 +47,15 @@ type QuestionAdd struct {
 	Content string `validate:"required,notblank,gte=6,lte=65535" json:"content"`
 	// html
 	HTML string `json:"-"`
-	// tags
-	//Tags []*TagItem `validate:"required,dive" json:"tags"`
 	// user id
-	UserID string `json:"-"`
-	QuestionPermission
-	CaptchaID   string `json:"captcha_id"` // captcha_id
-	CaptchaCode string `json:"captcha_code"`
+	UserID       string `json:"-"`
+	CopyRight    int    `validate:"required" json:"copyright"`
+	AllowReprint int    `validate:"required " json:"allow_reprint"`
+	AllowComment int    `validate:"required" json:"allow_comment"`
+	Feeds        int    `validate:"required " json:"feeds"`
+	CaptchaID    string `json:"captcha_id"` // captcha_id
+	CaptchaCode  string `json:"captcha_code"`
 }
-
-//todo
-//func (req *QuestionAdd) Check() (errFields []*validator.FormErrorField, err error) {
-//	req.HTML = converter.Markdown2HTML(req.Content)
-//	for _, tag := range req.Tags {
-//		if len(tag.OriginalText) > 0 {
-//			tag.ParsedText = converter.Markdown2HTML(tag.OriginalText)
-//		}
-//	}
-//	return nil, nil
-//}
 
 type QuestionAddByAnswer struct {
 	// question title
@@ -88,45 +71,8 @@ type QuestionAddByAnswer struct {
 	// user id
 	UserID              string   `json:"-"`
 	MentionUsernameList []string `validate:"omitempty" json:"mention_username_list"`
-	QuestionPermission
-	CaptchaID   string `json:"captcha_id"` // captcha_id
-	CaptchaCode string `json:"captcha_code"`
-}
-
-//func (req *QuestionAddByAnswer) Check() (errFields []*validator.FormErrorField, err error) {
-//	req.HTML = converter.Markdown2HTML(req.Content)
-//	req.AnswerHTML = converter.Markdown2HTML(req.AnswerContent)
-//	for _, tag := range req.Tags {
-//		if len(tag.OriginalText) > 0 {
-//			tag.ParsedText = converter.Markdown2HTML(tag.OriginalText)
-//		}
-//	}
-//	return nil, nil
-//}
-
-type QuestionPermission struct {
-	// whether user can add it
-	CanAdd bool `json:"-"`
-	// whether user can edit it
-	CanEdit bool `json:"-"`
-	// whether user can delete it
-	CanDelete bool `json:"-"`
-	// whether user can close it
-	CanClose bool `json:"-"`
-	// whether user can reopen it
-	CanReopen bool `json:"-"`
-	// whether user can pin it
-	CanPin   bool `json:"-"`
-	CanUnPin bool `json:"-"`
-	// whether user can hide it
-	CanHide bool `json:"-"`
-	CanShow bool `json:"-"`
-	// whether user can use reserved it
-	CanUseReservedTag bool `json:"-"`
-	// whether user can invite other user to answer this question
-	CanInviteOtherToAnswer bool `json:"-"`
-	CanAddTag              bool `json:"-"`
-	CanRecover             bool `json:"-"`
+	CaptchaID           string   `json:"captcha_id"` // captcha_id
+	CaptchaCode         string   `json:"captcha_code"`
 }
 
 type CheckCanQuestionUpdate struct {
@@ -154,9 +100,8 @@ type QuestionUpdate struct {
 	// user id
 	UserID       string `json:"-"`
 	NoNeedReview bool   `json:"-"`
-	QuestionPermission
-	CaptchaID   string `json:"captcha_id"` // captcha_id
-	CaptchaCode string `json:"captcha_code"`
+	CaptchaID    string `json:"captcha_id"` // captcha_id
+	CaptchaCode  string `json:"captcha_code"`
 }
 
 type QuestionRecoverReq struct {
@@ -165,18 +110,12 @@ type QuestionRecoverReq struct {
 }
 
 type QuestionUpdateInviteUser struct {
-	ID         string   `validate:"required" json:"id"`
-	InviteUser []string `validate:"omitempty"  json:"invite_user"`
-	UserID     string   `json:"-"`
-	QuestionPermission
-	CaptchaID   string `json:"captcha_id"` // captcha_id
-	CaptchaCode string `json:"captcha_code"`
+	ID          string   `validate:"required" json:"id"`
+	InviteUser  []string `validate:"omitempty"  json:"invite_user"`
+	UserID      string   `json:"-"`
+	CaptchaID   string   `json:"captcha_id"` // captcha_id
+	CaptchaCode string   `json:"captcha_code"`
 }
-
-//func (req *QuestionUpdate) Check() (errFields []*validator.FormErrorField, err error) {
-//	req.HTML = converter.Markdown2HTML(req.Content)
-//	return nil, nil
-//}
 
 type QuestionBaseInfo struct {
 	ID              string `json:"id" `
@@ -225,10 +164,6 @@ type QuestionInfo struct {
 	Collected            bool           `json:"collected"`
 	VoteStatus           string         `json:"vote_status"`
 	IsFollowed           bool           `json:"is_followed"`
-
-	// MemberActions
-	//MemberActions  []*PermissionMemberAction `json:"member_actions"`
-	//ExtendsActions []*PermissionMemberAction `json:"extends_actions"`
 }
 
 // UpdateQuestionResp update question resp
@@ -250,20 +185,12 @@ type AdminQuestionInfo struct {
 	UserInfo         *UserBasicInfo `json:"user_info"`
 }
 
-type OperationLevel string
-
-const (
-	OperationLevelInfo    OperationLevel = "info"
-	OperationLevelDanger  OperationLevel = "danger"
-	OperationLevelWarning OperationLevel = "warning"
-)
-
 type Operation struct {
-	Type        string         `json:"type"`
-	Description string         `json:"description"`
-	Msg         string         `json:"msg"`
-	Time        int64          `json:"time"`
-	Level       OperationLevel `json:"level"`
+	Type        string `json:"type"`
+	Description string `json:"description"`
+	Msg         string `json:"msg"`
+	Time        int64  `json:"time"`
+	Level       string `json:"level"`
 }
 
 type GetCloseTypeResp struct {
@@ -309,14 +236,6 @@ type UserQuestionInfo struct {
 	Status           string        `json:"status"`
 }
 
-const (
-	QuestionOrderCondNewest     = "newest"
-	QuestionOrderCondActive     = "active"
-	QuestionOrderCondFrequent   = "frequent"
-	QuestionOrderCondScore      = "score"
-	QuestionOrderCondUnanswered = "unanswered"
-)
-
 // QuestionPageReq query questions page
 type QuestionPageReq struct {
 	Page      int    `validate:"omitempty,min=1" form:"page"`
@@ -330,12 +249,6 @@ type QuestionPageReq struct {
 	UserIDBeSearched string `json:"-"`
 	TagID            string `json:"-"`
 }
-
-const (
-	QuestionPageRespOperationTypeAsked    = "asked"
-	QuestionPageRespOperationTypeAnswered = "answered"
-	QuestionPageRespOperationTypeModified = "modified"
-)
 
 type QuestionPageResp struct {
 	ID          string `json:"id" `
@@ -385,17 +298,6 @@ type AdminQuestionPageReq struct {
 	LoginUserID string `json:"-"`
 }
 
-//func (req *AdminQuestionPageReq) Check() (errField []*validator.FormErrorField, err error) {
-//	status, ok := entity.AdminQuestionSearchStatus[req.StatusCond]
-//	if ok {
-//		req.Status = status
-//	}
-//	if req.Status == 0 {
-//		req.Status = 1
-//	}
-//	return nil, nil
-//}
-
 // AdminAnswerPageReq admin answer page req
 type AdminAnswerPageReq struct {
 	Page          int    `validate:"omitempty,min=1" form:"page"`
@@ -408,31 +310,6 @@ type AdminAnswerPageReq struct {
 	Status        int    `json:"-"`
 	LoginUserID   string `json:"-"`
 }
-
-//func (req *AdminAnswerPageReq) Check() (errField []*validator.FormErrorField, err error) {
-//	req.QuestionID = uid.DeShortID(req.QuestionID)
-//	if req.QuestionID == "0" {
-//		req.QuestionID = ""
-//	}
-//
-//	if status, ok := entity.AdminAnswerSearchStatus[req.StatusCond]; ok {
-//		req.Status = status
-//	}
-//	if req.Status == 0 {
-//		req.Status = 1
-//	}
-//
-//	// parse query condition
-//	if len(req.Query) > 0 {
-//		prefix := "answer:"
-//		if strings.Contains(req.Query, prefix) {
-//			req.AnswerID = uid.DeShortID(strings.TrimSpace(strings.TrimPrefix(req.Query, prefix)))
-//		} else {
-//			req.QuestionTitle = strings.TrimSpace(req.Query)
-//		}
-//	}
-//	return nil, nil
-//}
 
 type AdminUpdateQuestionStatusReq struct {
 	QuestionID string `validate:"required" json:"question_id"`
@@ -462,28 +339,6 @@ type PersonalCollectionPageReq struct {
 	UserID   string `json:"-"`
 }
 
-const (
-	QuestionStatusAvailable = 1
-	QuestionStatusClosed    = 2
-	QuestionStatusDeleted   = 10
-	QuestionUnPin           = 1
-	QuestionPin             = 2
-	QuestionShow            = 1
-	QuestionHide            = 2
-)
-
-var AdminQuestionSearchStatus = map[string]int{
-	"available": QuestionStatusAvailable,
-	"closed":    QuestionStatusClosed,
-	"deleted":   QuestionStatusDeleted,
-}
-
-var AdminQuestionSearchStatusIntToString = map[int]string{
-	QuestionStatusAvailable: "available",
-	QuestionStatusClosed:    "closed",
-	QuestionStatusDeleted:   "deleted",
-}
-
 // Question question
 type Question struct {
 	ID               string    `xorm:"not null pk BIGINT(20) id"`
@@ -508,6 +363,10 @@ type Question struct {
 	LastAnswerID     string    `xorm:"not null default 0 BIGINT(20) last_answer_id"`
 	PostUpdateTime   time.Time `xorm:"post_update_time TIMESTAMP"`
 	RevisionID       string    `xorm:"not null default 0 BIGINT(20) revision_id"`
+	CopyRight        int       `xorm:"not null default 0 INT(11) copyright"`
+	AllowReprint     int       `xorm:"not null default 0 INT(11) allow_reprint"`
+	AllowComment     int       `xorm:"not null default 0 INT(11) allow_comment"`
+	Feeds            int       `xorm:"not null default 0 INT(11) feeds"`
 }
 
 // TableName question table name

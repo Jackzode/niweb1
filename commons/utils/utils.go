@@ -181,3 +181,7 @@ func DeShortID(id string) string {
 
 	return id
 }
+
+func IsNotZeroString(s string) bool {
+	return len(s) > 0 && s != "0"
+}

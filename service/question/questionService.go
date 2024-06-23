@@ -5,8 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/Jackzode/painting/commons/constants"
+	glog "github.com/Jackzode/painting/commons/logger"
 	"github.com/Jackzode/painting/commons/types"
+	"github.com/Jackzode/painting/commons/utils"
 	"github.com/Jackzode/painting/dao/post"
+	"github.com/Jackzode/painting/service/user"
+	"github.com/jinzhu/copier"
 	"time"
 )
 
@@ -21,21 +25,218 @@ func NewQuestionService() *QuestionService {
 	}
 }
 
+//
+//// PersonalCollectionPage get collection list by user
+//func (qs *QuestionService) PersonalCollectionPage(ctx context.Context, req *types.PersonalCollectionPageReq) (
+//	pageModel *utils.PageModel, err error) {
+//	list := make([]*types.QuestionInfo, 0)
+//	collectionSearch := &types.CollectionSearch{}
+//	collectionSearch.UserID = req.UserID
+//	collectionSearch.Page = req.Page
+//	collectionSearch.PageSize = req.PageSize
+//	collectionList, total, err := CollectionCommon.SearchList(ctx, collectionSearch)
+//	if err != nil {
+//		return nil, err
+//	}
+//	questionIDs := make([]string, 0)
+//	for _, item := range collectionList {
+//		questionIDs = append(questionIDs, item.ObjectID)
+//	}
+//
+//	questionMaps, err := qs.FindInfoByID(ctx, questionIDs, req.UserID)
+//	if err != nil {
+//		return nil, err
+//	}
+//	for _, id := range questionIDs {
+//		id = utils.EnShortID(id)
+//		_, ok := questionMaps[id]
+//		if ok {
+//			questionMaps[id].LastAnsweredUserInfo = nil
+//			questionMaps[id].UpdateUserInfo = nil
+//			questionMaps[id].Content = ""
+//			questionMaps[id].HTML = ""
+//			if questionMaps[id].Status == types.QuestionStatusDeleted {
+//				questionMaps[id].Title = "Deleted question"
+//			}
+//			list = append(list, questionMaps[id])
+//		}
+//	}
+//
+//	return utils.NewPageModel(total, list), nil
+//}
+
+// PersonalQuestionPage get question list by user
+func (qs *QuestionService) PersonalQuestionPage(ctx context.Context, req *types.PersonalQuestionPageReq) (
+	pageModel *utils.PageModel, err error) {
+
+	userinfo, exist, err := user.NewUserService().GetUserBasicInfoByUserName(ctx, req.Username)
+	if err != nil {
+		return nil, err
+	}
+	if !exist {
+		return nil, errors.New(constants.UserNotFound)
+	}
+	search := &types.QuestionPageReq{}
+	search.OrderCond = req.OrderCond
+	search.Page = req.Page
+	search.PageSize = req.PageSize
+	search.UserIDBeSearched = userinfo.ID
+	search.LoginUserID = req.LoginUserID
+	questionList, total, err := qs.GetQuestionPage(ctx, search)
+	if err != nil {
+		return nil, err
+	}
+	userQuestionInfoList := make([]*types.UserQuestionInfo, 0)
+	for _, item := range questionList {
+		info := &types.UserQuestionInfo{}
+		_ = copier.Copy(info, item)
+		status, ok := constants.AdminQuestionSearchStatusIntToString[item.Status]
+		if ok {
+			info.Status = status
+		}
+		userQuestionInfoList = append(userQuestionInfoList, info)
+	}
+	return utils.NewPageModel(total, userQuestionInfoList), nil
+}
+
+// UpdateQuestion update question
+func (qs *QuestionService) UpdateQuestion(ctx context.Context, req *types.QuestionUpdate) (questionInfo any, err error) {
+
+	questionInfo = &types.QuestionInfo{}
+	dbinfo, has, err := qs.questionDao.GetQuestion(ctx, req.ID)
+	if err != nil {
+		glog.Slog.Error(err.Error())
+		return
+	}
+	if !has {
+		err = errors.New("question not found")
+		return
+	}
+	if dbinfo.Status == constants.QuestionStatusDeleted {
+		err = errors.New(constants.QuestionCannotUpdate)
+		return nil, err
+	}
+
+	now := time.Now()
+	question := &types.Question{}
+	question.Title = req.Title
+	question.OriginalText = req.Content
+	question.ParsedText = req.HTML
+	question.ID = utils.DeShortID(req.ID)
+	question.UpdatedAt = now
+	question.PostUpdateTime = now
+	question.UserID = dbinfo.UserID
+	question.LastEditUserID = req.UserID
+
+	//If the content is the same, ignore it
+	if dbinfo.Title == req.Title && dbinfo.OriginalText == req.Content {
+		return
+	}
+
+	questionInfo, err = qs.GetQuestion(ctx, question.ID, question.UserID)
+	return
+}
+
+// GetQuestionPage query questions page
+func (qs *QuestionService) GetQuestionPage(ctx context.Context, req *types.QuestionPageReq) (
+	questions []*types.QuestionPageResp, total int64, err error) {
+	questions = make([]*types.QuestionPageResp, 0)
+
+	// query by user condition
+	if req.Username != "" {
+		userinfo, exist, err := user.NewUserService().GetUserBasicInfoByUserName(ctx, req.Username)
+		if err != nil {
+			return nil, 0, err
+		}
+		if !exist {
+			return questions, 0, nil
+		}
+		req.UserIDBeSearched = userinfo.ID
+	}
+
+	questionList, total, err := qs.questionDao.GetQuestionPage(ctx, req.Page, req.PageSize,
+		req.UserIDBeSearched, req.TagID, req.OrderCond, req.InDays)
+	if err != nil {
+		return nil, 0, err
+	}
+	questions, err = qs.FormatQuestionsPage(ctx, questionList, req.LoginUserID, req.OrderCond)
+	if err != nil {
+		return nil, 0, err
+	}
+	return questions, total, nil
+}
+
+// AddQuestion add question
+func (qs *QuestionService) AddQuestion(ctx context.Context, req *types.QuestionAdd) (questionInfo any, err error) {
+
+	question := &types.Question{}
+	now := time.Now()
+	question.UserID = req.UserID
+	question.Title = req.Title
+	question.OriginalText = req.Content
+	question.ParsedText = req.HTML
+	question.AcceptedAnswerID = "0"
+	question.LastAnswerID = "0"
+	question.LastEditUserID = "0"
+	question.AllowReprint = req.AllowReprint
+	question.AllowComment = req.AllowComment
+	question.CopyRight = req.CopyRight
+	question.Feeds = req.Feeds
+	//question.PostUpdateTime = nil
+	question.Status = constants.QuestionStatusAvailable
+	question.RevisionID = "0"
+	question.CreatedAt = now
+	question.PostUpdateTime = now
+	question.Pin = constants.QuestionUnPin
+	question.Show = constants.QuestionShow
+	//question.UpdatedAt = nil
+	err = qs.questionDao.AddQuestion(ctx, question)
+	if err != nil {
+		glog.Slog.Error(err.Error())
+		return
+	}
+
+	// user add question count
+	userQuestionCount, err := qs.GetUserQuestionCount(ctx, question.UserID)
+	if err != nil {
+		glog.Slog.Errorf("get user question count error %v", err)
+	} else {
+		err = user.NewUserService().UpdateQuestionCount(ctx, question.UserID, userQuestionCount)
+		if err != nil {
+			glog.Slog.Errorf("update user question count error %v", err)
+		}
+	}
+	questionInfo, err = qs.GetQuestion(ctx, question.ID, question.UserID)
+	return
+}
+
+func (qs *QuestionService) GetQuestionAndAddPV(ctx context.Context, questionID, loginUserID string) (resp *types.QuestionInfo, err error) {
+
+	err = qs.UpdatePv(ctx, questionID)
+	if err != nil {
+		glog.Slog.Error(err)
+	}
+	return qs.GetQuestion(ctx, questionID, loginUserID)
+}
+
+// GetQuestion get question one
+func (qs *QuestionService) GetQuestion(ctx context.Context, questionID, userID string) (resp *types.QuestionInfo, err error) {
+
+	question, err := qs.Info(ctx, questionID, userID)
+	if err != nil {
+		return
+	}
+	//将html中的标签去掉，只保留240个字符展示，多余的用。。。代替
+	question.Description = utils.FetchExcerpt(question.HTML, "...", 240)
+	return question, nil
+}
+
 func (qs *QuestionService) GetUserQuestionCount(ctx context.Context, userID string) (count int64, err error) {
 	return qs.questionDao.GetUserQuestionCount(ctx, userID)
 }
 
 func (qs *QuestionService) UpdatePv(ctx context.Context, questionID string) error {
 	return qs.questionDao.UpdatePvCount(ctx, questionID)
-}
-
-func (qs *QuestionService) UpdateAnswerCount(ctx context.Context, questionID string) error {
-	//count, err := qs.questionDao.AnswerRepo.GetCountByQuestionID(ctx, questionID)
-	//if err != nil {
-	//	return err
-	//}
-	//return qs.questionDao.UpdateAnswerCount(ctx, questionID, int(count))
-	return nil
 }
 
 func (qs *QuestionService) UpdateCollectionCount(ctx context.Context, questionID string) (count int64, err error) {
@@ -114,68 +315,29 @@ func (qs *QuestionService) InviteUserInfo(ctx context.Context, questionID string
 	return InviteUserInfo, nil
 }
 
-/*
 func (qs *QuestionService) Info(ctx context.Context, questionID string, loginUserID string) (showinfo *types.QuestionInfo, err error) {
 
 	dbinfo, has, err := qs.questionDao.GetQuestion(ctx, questionID)
 	if err != nil {
 		return showinfo, err
 	}
-	dbinfo.ID = uid.DeShortID(dbinfo.ID)
+	dbinfo.ID = utils.DeShortID(dbinfo.ID)
 	if !has {
 		return showinfo, errors.New(constants.QuestionNotFound)
 	}
 	showinfo = qs.ShowFormat(ctx, dbinfo)
 
-	//
-	if showinfo.Status == 2 {
-		var metainfo *types.Meta
-		metainfo, err = MetaService.GetMetaByObjectIdAndKey(ctx, dbinfo.ID, types.QuestionCloseReasonKey)
-		if err != nil {
-			glog.Slog.Error(err)
-		} else {
-			// metainfo.Value
-			closemsg := &types.CloseQuestionMeta{}
-			err = json.Unmarshal([]byte(metainfo.Value), closemsg)
-			if err != nil {
-				glog.Slog.Error("json.Unmarshal CloseQuestionMeta error", err.Error())
-			} else {
-				cfg, err := utils.GetConfigByID(ctx, closemsg.CloseType)
-				if err != nil {
-					glog.Slog.Error("json.Unmarshal QuestionCloseJson error", err.Error())
-				} else {
-					reasonItem := &types.ReasonItem{}
-					_ = json.Unmarshal(cfg.GetByteValue(), reasonItem)
-					reasonItem.Translate(cfg.Key, utils.GetLangByCtx(ctx))
-					operation := &types.Operation{}
-					operation.Type = reasonItem.Name
-					operation.Description = reasonItem.Description
-					operation.Msg = closemsg.CloseMsg
-					operation.Time = metainfo.CreatedAt.Unix()
-					operation.Level = types.OperationLevelInfo
-					showinfo.Operation = operation
-				}
-			}
-		}
-	}
-
-	tagmap, err := TagServicer.GetObjectTag(ctx, questionID)
-	if err != nil {
-		return showinfo, err
-	}
-	showinfo.Tags = tagmap
-
 	userIds := make([]string, 0)
-	if checker.IsNotZeroString(dbinfo.UserID) {
+	if utils.IsNotZeroString(dbinfo.UserID) {
 		userIds = append(userIds, dbinfo.UserID)
 	}
-	if checker.IsNotZeroString(dbinfo.LastEditUserID) {
+	if utils.IsNotZeroString(dbinfo.LastEditUserID) {
 		userIds = append(userIds, dbinfo.LastEditUserID)
 	}
-	if checker.IsNotZeroString(showinfo.LastAnsweredUserID) {
+	if utils.IsNotZeroString(showinfo.LastAnsweredUserID) {
 		userIds = append(userIds, showinfo.LastAnsweredUserID)
 	}
-	userInfoMap, err := UserCommonServicer.BatchUserBasicInfoByID(ctx, userIds)
+	userInfoMap, err := user.NewUserService().BatchUserBasicInfoByID(ctx, userIds)
 	if err != nil {
 		return showinfo, err
 	}
@@ -197,45 +359,36 @@ func (qs *QuestionService) Info(ctx context.Context, questionID string, loginUse
 		return showinfo, nil
 	}
 
-	showinfo.VoteStatus = qs.questionDao.VoteRepo.GetVoteStatus(ctx, questionID, loginUserID)
+	//showinfo.VoteStatus = qs.questionDao.VoteRepo.GetVoteStatus(ctx, questionID, loginUserID)
 
 	// // check is followed
-	isFollowed, _ := qs.questionDao.FollowRepo.IsFollowed(ctx, loginUserID, questionID)
-	showinfo.IsFollowed = isFollowed
+	//isFollowed, _ := qs.questionDao.FollowRepo.IsFollowed(ctx, loginUserID, questionID)
+	//showinfo.IsFollowed = isFollowed
 
-	ids, err := AnswerCommonServicer.SearchAnswerIDs(ctx, loginUserID, dbinfo.ID)
-	if err != nil {
-		glog.Slog.Error("AnswerFunc.SearchAnswerIDs", err)
-	}
-	showinfo.Answered = len(ids) > 0
-	if showinfo.Answered {
-		showinfo.FirstAnswerId = ids[0]
-	}
-
-	collectedMap, err := CollectionCommon.SearchObjectCollected(ctx, loginUserID, []string{dbinfo.ID})
-	if err != nil {
-		return nil, err
-	}
-	if len(collectedMap) > 0 {
-		showinfo.Collected = true
-	}
+	//collectedMap, err := CollectionCommon.SearchObjectCollected(ctx, loginUserID, []string{dbinfo.ID})
+	//if err != nil {
+	//	return nil, err
+	//}
+	//if len(collectedMap) > 0 {
+	//	showinfo.Collected = true
+	//}
 	return showinfo, nil
 }
-*/
 
 func (qs *QuestionService) FormatQuestionsPage(
 	ctx context.Context, questionList []*types.Question, loginUserID string, orderCond string) (
 	formattedQuestions []*types.QuestionPageResp, err error) {
+
 	formattedQuestions = make([]*types.QuestionPageResp, 0)
 	questionIDs := make([]string, 0)
 	userIDs := make([]string, 0)
 	for _, questionInfo := range questionList {
 		t := &types.QuestionPageResp{
-			ID:        questionInfo.ID,
-			CreatedAt: questionInfo.CreatedAt.Unix(),
-			Title:     questionInfo.Title,
-			//UrlTitle:         htmltext.UrlTitle(questionInfo.Title),
-			//Description:      htmltext.FetchExcerpt(questionInfo.ParsedText, "...", 240),
+			ID:               questionInfo.ID,
+			CreatedAt:        questionInfo.CreatedAt.Unix(),
+			Title:            questionInfo.Title,
+			UrlTitle:         utils.UrlTitle(questionInfo.Title),
+			Description:      utils.FetchExcerpt(questionInfo.ParsedText, "...", 240),
 			Status:           questionInfo.Status,
 			ViewCount:        questionInfo.ViewCount,
 			UniqueViewCount:  questionInfo.UniqueViewCount,
@@ -251,77 +404,16 @@ func (qs *QuestionService) FormatQuestionsPage(
 
 		questionIDs = append(questionIDs, questionInfo.ID)
 		userIDs = append(userIDs, questionInfo.UserID)
-		haveEdited, haveAnswered := false, false
-		//if checker.IsNotZeroString(questionInfo.LastEditUserID) {
-		//	haveEdited = true
-		//	userIDs = append(userIDs, questionInfo.LastEditUserID)
-		//}
-		//if checker.IsNotZeroString(questionInfo.LastAnswerID) {
-		//	haveAnswered = true
-		//
-		//	answerInfo, exist, err := qs.questionDao.AnswerRepo.GetAnswer(ctx, questionInfo.LastAnswerID)
-		//	if err == nil && exist {
-		//		if answerInfo.LastEditUserID != "0" {
-		//			t.LastAnsweredUserID = answerInfo.LastEditUserID
-		//		} else {
-		//			t.LastAnsweredUserID = answerInfo.UserID
-		//		}
-		//		t.LastAnsweredAt = answerInfo.CreatedAt
-		//		userIDs = append(userIDs, t.LastAnsweredUserID)
-		//	}
-		//}
 
 		// if order condition is newest or nobody edited or nobody answered, only show question author
-		if orderCond == types.QuestionOrderCondNewest || (!haveEdited && !haveAnswered) {
-			t.OperationType = types.QuestionPageRespOperationTypeAsked
+		if orderCond == constants.QuestionOrderCondNewest {
+			t.OperationType = constants.QuestionPageRespOperationTypeAsked
 			t.OperatedAt = questionInfo.CreatedAt.Unix()
 			t.Operator = &types.QuestionPageRespOperator{ID: questionInfo.UserID}
-		} else {
-			// if no one
-			if haveEdited {
-				t.OperationType = types.QuestionPageRespOperationTypeModified
-				t.OperatedAt = questionInfo.UpdatedAt.Unix()
-				t.Operator = &types.QuestionPageRespOperator{ID: questionInfo.LastEditUserID}
-			}
-
-			if haveAnswered {
-				if t.LastAnsweredAt.Unix() > t.OperatedAt {
-					t.OperationType = types.QuestionPageRespOperationTypeAnswered
-					t.OperatedAt = t.LastAnsweredAt.Unix()
-					t.Operator = &types.QuestionPageRespOperator{ID: t.LastAnsweredUserID}
-				}
-			}
 		}
 		formattedQuestions = append(formattedQuestions, t)
 	}
 
-	//tagsMap, err := TagServicer.BatchGetObjectTag(ctx, questionIDs)
-	//if err != nil {
-	//	return formattedQuestions, err
-	//}
-	//userInfoMap, err := UserCommonServicer.BatchUserBasicInfoByID(ctx, userIDs)
-	//if err != nil {
-	//	return formattedQuestions, err
-	//}
-
-	//for _, item := range formattedQuestions {
-	//	tags, ok := tagsMap[item.ID]
-	//	if ok {
-	//		item.Tags = tags
-	//	} else {
-	//		item.Tags = make([]*types.TagResp, 0)
-	//	}
-	//	userInfo, ok := userInfoMap[item.Operator.ID]
-	//	if ok {
-	//		if userInfo != nil {
-	//			item.Operator.DisplayName = userInfo.DisplayName
-	//			item.Operator.Username = userInfo.Username
-	//			item.Operator.Rank = userInfo.Rank
-	//			item.Operator.Status = userInfo.Status
-	//		}
-	//	}
-	//
-	//}
 	return formattedQuestions, nil
 }
 
@@ -376,11 +468,11 @@ func (qs *QuestionService) RemoveQuestion(ctx context.Context, req *types.Remove
 		return nil
 	}
 
-	if questionInfo.Status == types.QuestionStatusDeleted {
+	if questionInfo.Status == constants.QuestionStatusDeleted {
 		return nil
 	}
 
-	questionInfo.Status = types.QuestionStatusDeleted
+	questionInfo.Status = constants.QuestionStatusDeleted
 	err = qs.questionDao.UpdateQuestionStatus(ctx, questionInfo.ID, questionInfo.Status)
 	if err != nil {
 		return err
@@ -407,7 +499,7 @@ func (qs *QuestionService) CloseQuestion(ctx context.Context, req *types.CloseQu
 	if !has {
 		return nil
 	}
-	questionInfo.Status = types.QuestionStatusClosed
+	questionInfo.Status = constants.QuestionStatusClosed
 	err = qs.questionDao.UpdateQuestionStatus(ctx, questionInfo.ID, questionInfo.Status)
 	if err != nil {
 		return err

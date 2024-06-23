@@ -2,6 +2,7 @@ package post
 
 import (
 	"context"
+	"github.com/Jackzode/painting/commons/constants"
 	"github.com/Jackzode/painting/commons/handler"
 	glog "github.com/Jackzode/painting/commons/logger"
 	"github.com/Jackzode/painting/commons/types"
@@ -38,9 +39,6 @@ func (qr *PostDao) AddQuestion(ctx context.Context, question *types.Question) (e
 	}
 	//todo
 	question.ID = utils.EnShortID(question.ID)
-
-	//todo
-	//_ = qr.updateSearch(ctx, question.ID)
 	return
 }
 
@@ -136,7 +134,7 @@ func (qr *PostDao) UpdateQuestionStatusWithOutUpdateTime(ctx context.Context, qu
 
 func (qr *PostDao) RecoverQuestion(ctx context.Context, questionID string) (err error) {
 	questionID = utils.DeShortID(questionID)
-	_, err = qr.DB.Context(ctx).ID(questionID).Cols("status").Update(&types.Question{Status: types.QuestionStatusAvailable})
+	_, err = qr.DB.Context(ctx).ID(questionID).Cols("status").Update(&types.Question{Status: constants.QuestionStatusAvailable})
 	if err != nil {
 		return err
 	}
@@ -193,7 +191,7 @@ func (qr *PostDao) GetQuestionsByTitle(ctx context.Context, title string, pageSi
 	questionList []*types.Question, err error) {
 	questionList = make([]*types.Question, 0)
 	session := qr.DB.Context(ctx)
-	session.Where("status != ?", types.QuestionStatusDeleted)
+	session.Where("status != ?", constants.QuestionStatusDeleted)
 	session.Where("title like ?", "%"+title+"%")
 	session.Limit(pageSize)
 	err = session.Find(&questionList)
@@ -237,8 +235,8 @@ func (qr *PostDao) GetQuestionList(ctx context.Context, question *types.Question
 
 func (qr *PostDao) GetQuestionCount(ctx context.Context) (count int64, err error) {
 	session := qr.DB.Context(ctx)
-	session.In("status", []int{types.QuestionStatusAvailable, types.QuestionStatusClosed})
-	count, err = session.Count(&types.Question{Show: types.QuestionShow})
+	session.In("status", []int{constants.QuestionStatusAvailable, constants.QuestionStatusClosed})
+	count, err = session.Count(&types.Question{Show: constants.QuestionShow})
 	if err != nil {
 		return 0, err
 	}
@@ -247,7 +245,7 @@ func (qr *PostDao) GetQuestionCount(ctx context.Context) (count int64, err error
 
 func (qr *PostDao) GetUserQuestionCount(ctx context.Context, userID string) (count int64, err error) {
 	session := qr.DB.Context(ctx)
-	session.In("status", []int{types.QuestionStatusAvailable, types.QuestionStatusClosed})
+	session.In("status", []int{constants.QuestionStatusAvailable, constants.QuestionStatusClosed})
 	count, err = session.Count(&types.Question{UserID: userID})
 	return
 }
@@ -309,7 +307,7 @@ func (qr *PostDao) GetQuestionPage(ctx context.Context, page, pageSize int, user
 	questionList = make([]*types.Question, 0)
 
 	session := qr.DB.Context(ctx).Where("question.status = ? OR question.status = ?",
-		types.QuestionStatusAvailable, types.QuestionStatusClosed)
+		constants.QuestionStatusAvailable, constants.QuestionStatusClosed)
 	if len(tagID) > 0 {
 		session.Join("LEFT", "tag_rel", "question.id = tag_rel.object_id")
 		session.And("tag_rel.tag_id = ?", tagID)
@@ -319,7 +317,7 @@ func (qr *PostDao) GetQuestionPage(ctx context.Context, page, pageSize int, user
 	if len(userID) > 0 {
 		session.And("question.user_id = ?", userID)
 	} else {
-		session.And("question.show = ?", types.QuestionShow)
+		session.And("question.show = ?", constants.QuestionShow)
 	}
 	if inDays > 0 {
 		session.And("question.created_at > ?", time.Now().AddDate(0, 0, -inDays))
@@ -477,7 +475,7 @@ func (qr *PostDao) RemoveAllUserQuestion(ctx context.Context, userID string) (er
 	// get all question id that need to be deleted
 	questionIDs := make([]string, 0)
 	session := qr.DB.Context(ctx).Where("user_id = ?", userID)
-	session.Where("status != ?", types.QuestionStatusDeleted)
+	session.Where("status != ?", constants.QuestionStatusDeleted)
 	err = session.Select("id").Table("question").Find(&questionIDs)
 	if err != nil {
 		return err
@@ -490,10 +488,10 @@ func (qr *PostDao) RemoveAllUserQuestion(ctx context.Context, userID string) (er
 
 	// delete all question
 	session = qr.DB.Context(ctx).Where("user_id = ?", userID)
-	session.Where("status != ?", types.QuestionStatusDeleted)
+	session.Where("status != ?", constants.QuestionStatusDeleted)
 	_, err = session.Cols("status", "updated_at").Update(&types.Question{
 		UpdatedAt: time.Now(),
-		Status:    types.QuestionStatusDeleted,
+		Status:    constants.QuestionStatusDeleted,
 	})
 	if err != nil {
 		return err
