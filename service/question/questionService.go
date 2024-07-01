@@ -9,94 +9,84 @@ import (
 	"github.com/Jackzode/painting/commons/types"
 	"github.com/Jackzode/painting/commons/utils"
 	"github.com/Jackzode/painting/dao/post"
+	collectService "github.com/Jackzode/painting/service/collection"
 	"github.com/Jackzode/painting/service/user"
-	"github.com/jinzhu/copier"
 	"time"
 )
 
 type QuestionService struct {
-	questionDao *post.PostDao
+	questionDao    *post.PostDao
+	userService    *user.UserService
+	collectService *collectService.CollectionService
 }
 
 func NewQuestionService() *QuestionService {
 
 	return &QuestionService{
-		questionDao: post.NewPostRepo(),
+		questionDao:    post.NewPostRepo(),
+		userService:    user.NewUserService(),
+		collectService: collectService.NewCollectionService(),
 	}
 }
 
-//
-//// PersonalCollectionPage get collection list by user
-//func (qs *QuestionService) PersonalCollectionPage(ctx context.Context, req *types.PersonalCollectionPageReq) (
-//	pageModel *utils.PageModel, err error) {
-//	list := make([]*types.QuestionInfo, 0)
-//	collectionSearch := &types.CollectionSearch{}
-//	collectionSearch.UserID = req.UserID
-//	collectionSearch.Page = req.Page
-//	collectionSearch.PageSize = req.PageSize
-//	collectionList, total, err := CollectionCommon.SearchList(ctx, collectionSearch)
-//	if err != nil {
-//		return nil, err
-//	}
-//	questionIDs := make([]string, 0)
-//	for _, item := range collectionList {
-//		questionIDs = append(questionIDs, item.ObjectID)
-//	}
-//
-//	questionMaps, err := qs.FindInfoByID(ctx, questionIDs, req.UserID)
-//	if err != nil {
-//		return nil, err
-//	}
-//	for _, id := range questionIDs {
-//		id = utils.EnShortID(id)
-//		_, ok := questionMaps[id]
-//		if ok {
-//			questionMaps[id].LastAnsweredUserInfo = nil
-//			questionMaps[id].UpdateUserInfo = nil
-//			questionMaps[id].Content = ""
-//			questionMaps[id].HTML = ""
-//			if questionMaps[id].Status == types.QuestionStatusDeleted {
-//				questionMaps[id].Title = "Deleted question"
-//			}
-//			list = append(list, questionMaps[id])
-//		}
-//	}
-//
-//	return utils.NewPageModel(total, list), nil
-//}
+// PersonalCollectionPage get collection list by user
+func (qs *QuestionService) PersonalCollectionPage(ctx context.Context, req *types.PersonalCollectionPageReq) (
+	pageModel *utils.PageModel, err error) {
+	list := make([]*types.QuestionPageResp, 0)
+	collectionSearch := &types.CollectionSearch{}
+	collectionSearch.UserID = req.UserID
+	collectionSearch.Page = req.Page
+	collectionSearch.PageSize = req.PageSize
+	collectionList, total, err := qs.collectService.SearchList(ctx, collectionSearch)
+	if err != nil {
+		return nil, err
+	}
+	questionIDs := make([]string, 0)
+	for _, item := range collectionList {
+		questionIDs = append(questionIDs, item.ObjectID)
+	}
+
+	questionMaps, err := qs.FindInfoByIDs(ctx, questionIDs, req.UserID)
+	if err != nil {
+		return nil, err
+	}
+	for _, id := range questionIDs {
+		_, ok := questionMaps[id]
+		if ok {
+			//questionMaps[id].LastAnsweredUserInfo = nil
+			//questionMaps[id].UpdateUserInfo = nil
+			//questionMaps[id].Content = ""
+			//questionMaps[id].HTML = ""
+			list = append(list, questionMaps[id])
+		}
+	}
+
+	return utils.NewPageModel(total, list), nil
+}
 
 // PersonalQuestionPage get question list by user
 func (qs *QuestionService) PersonalQuestionPage(ctx context.Context, req *types.PersonalQuestionPageReq) (
 	pageModel *utils.PageModel, err error) {
 
-	userinfo, exist, err := user.NewUserService().GetUserBasicInfoByUserName(ctx, req.Username)
-	if err != nil {
-		return nil, err
-	}
-	if !exist {
-		return nil, errors.New(constants.UserNotFound)
-	}
+	//userinfo, exist, err := qs.userService.GetUserBasicInfoByUserName(ctx, req.Username)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//if !exist {
+	//	return nil, errors.New(constants.UserNotFound)
+	//}
 	search := &types.QuestionPageReq{}
 	search.OrderCond = req.OrderCond
 	search.Page = req.Page
 	search.PageSize = req.PageSize
-	search.UserIDBeSearched = userinfo.ID
+	search.Username = req.Username
+	search.UserIDBeSearched = req.LoginUserID
 	search.LoginUserID = req.LoginUserID
 	questionList, total, err := qs.GetQuestionPage(ctx, search)
 	if err != nil {
 		return nil, err
 	}
-	userQuestionInfoList := make([]*types.UserQuestionInfo, 0)
-	for _, item := range questionList {
-		info := &types.UserQuestionInfo{}
-		_ = copier.Copy(info, item)
-		status, ok := constants.AdminQuestionSearchStatusIntToString[item.Status]
-		if ok {
-			info.Status = status
-		}
-		userQuestionInfoList = append(userQuestionInfoList, info)
-	}
-	return utils.NewPageModel(total, userQuestionInfoList), nil
+	return utils.NewPageModel(total, questionList), nil
 }
 
 // UpdateQuestion update question
@@ -140,11 +130,11 @@ func (qs *QuestionService) UpdateQuestion(ctx context.Context, req *types.Questi
 // GetQuestionPage query questions page
 func (qs *QuestionService) GetQuestionPage(ctx context.Context, req *types.QuestionPageReq) (
 	questions []*types.QuestionPageResp, total int64, err error) {
-	questions = make([]*types.QuestionPageResp, 0)
 
+	questions = make([]*types.QuestionPageResp, 0)
 	// query by user condition
 	if req.Username != "" {
-		userinfo, exist, err := user.NewUserService().GetUserBasicInfoByUserName(ctx, req.Username)
+		userinfo, exist, err := qs.userService.GetUserBasicInfoByUserName(ctx, req.Username)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -178,11 +168,10 @@ func (qs *QuestionService) AddQuestion(ctx context.Context, req *types.QuestionA
 	question.AcceptedAnswerID = "0"
 	question.LastAnswerID = "0"
 	question.LastEditUserID = "0"
-	question.AllowReprint = req.AllowReprint
-	question.AllowComment = req.AllowComment
-	question.CopyRight = req.CopyRight
-	question.Feeds = req.Feeds
-	//question.PostUpdateTime = nil
+	question.AllowReprint = utils.Str2Int(req.AllowReprint)
+	question.AllowComment = utils.Str2Int(req.AllowComment)
+	question.CopyRight = utils.Str2Int(req.CopyRight)
+	question.Feeds = utils.Str2Int(req.Feeds)
 	question.Status = constants.QuestionStatusAvailable
 	question.RevisionID = "0"
 	question.CreatedAt = now
@@ -201,7 +190,7 @@ func (qs *QuestionService) AddQuestion(ctx context.Context, req *types.QuestionA
 	if err != nil {
 		glog.Slog.Errorf("get user question count error %v", err)
 	} else {
-		err = user.NewUserService().UpdateQuestionCount(ctx, question.UserID, userQuestionCount)
+		err = qs.userService.UpdateQuestionCount(ctx, question.UserID, userQuestionCount)
 		if err != nil {
 			glog.Slog.Errorf("update user question count error %v", err)
 		}
@@ -264,6 +253,7 @@ func (qs *QuestionService) UpdatePostTime(ctx context.Context, questionID string
 	questioninfo.PostUpdateTime = now
 	return qs.questionDao.UpdateQuestion(ctx, questioninfo, []string{"post_update_time"})
 }
+
 func (qs *QuestionService) UpdatePostSetTime(ctx context.Context, questionID string, setTime time.Time) error {
 	questioninfo := &types.Question{}
 	questioninfo.ID = questionID
@@ -271,13 +261,13 @@ func (qs *QuestionService) UpdatePostSetTime(ctx context.Context, questionID str
 	return qs.questionDao.UpdateQuestion(ctx, questioninfo, []string{"post_update_time"})
 }
 
-func (qs *QuestionService) FindInfoByID(ctx context.Context, questionIDs []string, loginUserID string) (map[string]*types.QuestionInfo, error) {
-	list := make(map[string]*types.QuestionInfo)
+func (qs *QuestionService) FindInfoByIDs(ctx context.Context, questionIDs []string, loginUserID string) (map[string]*types.QuestionPageResp, error) {
+	list := make(map[string]*types.QuestionPageResp)
 	questionList, err := qs.questionDao.FindByID(ctx, questionIDs)
 	if err != nil {
 		return list, err
 	}
-	questions, err := qs.FormatQuestions(ctx, questionList, loginUserID)
+	questions, err := qs.FormatQuestionsPage(ctx, questionList, loginUserID, "")
 	if err != nil {
 		return list, err
 	}
@@ -337,7 +327,7 @@ func (qs *QuestionService) Info(ctx context.Context, questionID string, loginUse
 	if utils.IsNotZeroString(showinfo.LastAnsweredUserID) {
 		userIds = append(userIds, showinfo.LastAnsweredUserID)
 	}
-	userInfoMap, err := user.NewUserService().BatchUserBasicInfoByID(ctx, userIds)
+	userInfoMap, err := qs.userService.BatchUserBasicInfoByID(ctx, userIds)
 	if err != nil {
 		return showinfo, err
 	}
@@ -380,7 +370,7 @@ func (qs *QuestionService) FormatQuestionsPage(
 	formattedQuestions []*types.QuestionPageResp, err error) {
 
 	formattedQuestions = make([]*types.QuestionPageResp, 0)
-	questionIDs := make([]string, 0)
+	userIdMap := make(map[string]struct{})
 	userIDs := make([]string, 0)
 	for _, questionInfo := range questionList {
 		t := &types.QuestionPageResp{
@@ -400,18 +390,30 @@ func (qs *QuestionService) FormatQuestionsPage(
 			LastAnswerID:     questionInfo.LastAnswerID,
 			Pin:              questionInfo.Pin,
 			Show:             questionInfo.Show,
+			AuthorID:         questionInfo.UserID,
+			Content:          questionInfo.OriginalText,
 		}
 
-		questionIDs = append(questionIDs, questionInfo.ID)
-		userIDs = append(userIDs, questionInfo.UserID)
-
-		// if order condition is newest or nobody edited or nobody answered, only show question author
-		if orderCond == constants.QuestionOrderCondNewest {
-			t.OperationType = constants.QuestionPageRespOperationTypeAsked
-			t.OperatedAt = questionInfo.CreatedAt.Unix()
-			t.Operator = &types.QuestionPageRespOperator{ID: questionInfo.UserID}
-		}
+		//questionIDs = append(questionIDs, questionInfo.ID)
+		//userIDs = append(userIDs, questionInfo.UserID)
+		userIdMap[questionInfo.UserID] = struct{}{}
 		formattedQuestions = append(formattedQuestions, t)
+	}
+	for id := range userIdMap {
+		userIDs = append(userIDs, id)
+	}
+	basicInfoByID, err := qs.userService.BatchUserBasicInfoByID(ctx, userIDs)
+	if err != nil {
+		return formattedQuestions, err
+	}
+	for _, question := range formattedQuestions {
+		useInfo, ok := basicInfoByID[question.AuthorID]
+		if ok {
+			question.AuthorInfo.Avatar = useInfo.Avatar
+			question.AuthorInfo.Username = useInfo.Username
+			question.AuthorInfo.Rank = useInfo.Rank
+			question.AuthorInfo.Description = useInfo.Description
+		}
 	}
 
 	return formattedQuestions, nil

@@ -39,6 +39,7 @@ const (
 	CollectionObjectType = "collection"
 	CommentObjectType    = "comment"
 	ReportObjectType     = "report"
+	LikesType            = "likes"
 )
 
 var (
@@ -50,6 +51,7 @@ var (
 		CollectionObjectType: 6,
 		CommentObjectType:    7,
 		ReportObjectType:     8,
+		LikesType:            9,
 	}
 )
 

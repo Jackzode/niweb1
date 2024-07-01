@@ -4,6 +4,10 @@ import (
 	"time"
 )
 
+type CaptchaCodeReq struct {
+	Email string `json:"email" form:"email"`
+}
+
 type ActionRecordResp struct {
 	CaptchaID  string `json:"captcha_id"`
 	CaptchaImg string `json:"captcha_img"`
@@ -18,11 +22,11 @@ type UserVerifyEmailReq struct {
 }
 
 type UserRegisterReq struct {
-	Username    string `validate:"required,gt=3,lte=30" json:"username"`
-	Email       string `validate:"required,email,gt=0,lte=500" json:"email" `
-	Password    string `validate:"required,gte=8,lte=32" json:"password"`
-	CaptchaID   string `json:"captcha_id" `
-	CaptchaCode string `json:"captcha_code"`
+	Username string `validate:"required,gt=3,lte=30" json:"username"`
+	Email    string `validate:"required,email,gt=0,lte=500" json:"email" `
+	Password string `validate:"required,gte=8,lte=32" json:"password"`
+	//CaptchaID   string `json:"captcha_id" `
+	CaptchaCode string `validate:"required " json:"captcha_code"`
 	IP          string `json:"-" `
 }
 
@@ -225,4 +229,5 @@ type UserBasicInfo struct {
 	Website     string `json:"website"`
 	CityId      string `json:"city_id"`
 	Status      string `json:"status"`
+	Description string `json:"description"`
 }

@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"github.com/Jackzode/painting/commons/constants"
 	"github.com/Jackzode/painting/commons/types"
 	"github.com/Jackzode/painting/commons/utils"
@@ -29,7 +30,7 @@ func (qc *QuestionController) AddQuestion(ctx *gin.Context) {
 		return
 	}
 
-	req.UserID = utils.GetUidFromTokenByCtx(ctx)
+	req.UserID, _ = utils.GetUidFromTokenByCtx(ctx)
 
 	//add question into db
 	resp, err := qc.QuestionService.AddQuestion(ctx, req)
@@ -44,7 +45,7 @@ func (qc *QuestionController) AddQuestion(ctx *gin.Context) {
 func (qc *QuestionController) GetQuestion(ctx *gin.Context) {
 	id := ctx.Query("id")
 	id = utils.DeShortID(id)
-	userID := utils.GetUidFromTokenByCtx(ctx)
+	userID, _ := utils.GetUidFromTokenByCtx(ctx)
 	//校对当前用户是否是obj的creator
 	info, err := qc.QuestionService.GetQuestionAndAddPV(ctx, id, userID)
 	if err != nil {
@@ -54,16 +55,21 @@ func (qc *QuestionController) GetQuestion(ctx *gin.Context) {
 	controller.HandleResponse(ctx, constants.SuccessCode, constants.Success, info)
 }
 
-// GetQuestionInviteUserInfo get question invite user info
-// @Summary get question invite user info
-// @Description get question invite user info
-// @Tags Question
-// @Security ApiKeyAuth
-// @Accept  json
-// @Produce  json
-// @Param id query string true "Question ID"  default(1)
-// @Success 200 {string} string ""
-// @Router /answer/api/v1/question/invite [get]
+func (qc *QuestionController) GetQuestionPage(ctx *gin.Context) {
+	req := &types.QuestionPageReq{}
+	if !controller.BindAndCheckParams(ctx, req) {
+		return
+	}
+	req.LoginUserID, _ = utils.GetUidFromTokenByCtx(ctx)
+	fmt.Printf("GetQuestionPage-req=%+v\n", req)
+	questions, total, err := qc.QuestionService.GetQuestionPage(ctx, req)
+	if err != nil {
+		controller.HandleResponse(ctx, constants.InternalErrCode, constants.InternalErrMsg, nil)
+		return
+	}
+	controller.HandleResponse(ctx, constants.SuccessCode, constants.Success, utils.NewPageModel(total, questions))
+}
+
 func (qc *QuestionController) GetQuestionInviteUserInfo(ctx *gin.Context) {
 	questionID := utils.DeShortID(ctx.Query("id"))
 	resp, err := qc.QuestionService.InviteUserInfo(ctx, questionID)
@@ -74,30 +80,6 @@ func (qc *QuestionController) GetQuestionInviteUserInfo(ctx *gin.Context) {
 
 }
 
-// QuestionPage get questions by page
-// @Summary get questions by page
-// @Description get questions by page
-// @Tags Question
-// @Accept  json
-// @Produce  json
-// @Param data body types.QuestionPageReq  true "QuestionPageReq"
-// @Success 200 {object} handler.RespBody{data=pager.PageModel{list=[]types.QuestionPageResp}}
-// @Router /answer/api/v1/question/page [get]
-func (qc *QuestionController) QuestionPage(ctx *gin.Context) {
-	req := &types.QuestionPageReq{}
-	if !controller.BindAndCheckParams(ctx, req) {
-		return
-	}
-	req.LoginUserID = utils.GetUidFromTokenByCtx(ctx)
-
-	questions, total, err := qc.QuestionService.GetQuestionPage(ctx, req)
-	if err != nil {
-		controller.HandleResponse(ctx, constants.InternalErrCode, constants.InternalErrMsg, nil)
-		return
-	}
-	controller.HandleResponse(ctx, constants.SuccessCode, constants.Success, utils.NewPageModel(total, questions))
-}
-
 func (qc *QuestionController) UpdateQuestion(ctx *gin.Context) {
 	req := &types.QuestionUpdate{}
 
@@ -105,7 +87,7 @@ func (qc *QuestionController) UpdateQuestion(ctx *gin.Context) {
 		return
 	}
 	req.ID = utils.DeShortID(req.ID)
-	req.UserID = utils.GetUidFromTokenByCtx(ctx)
+	req.UserID, _ = utils.GetUidFromTokenByCtx(ctx)
 	resp, err := qc.QuestionService.UpdateQuestion(ctx, req)
 	if err != nil {
 		controller.HandleResponse(ctx, constants.InternalErrCode, constants.InternalErrMsg, nil)
@@ -127,7 +109,8 @@ func (qc *QuestionController) PersonalQuestionPage(ctx *gin.Context) {
 		return
 	}
 
-	req.LoginUserID = utils.GetUidFromTokenByCtx(ctx)
+	req.LoginUserID, _ = utils.GetUidFromTokenByCtx(ctx)
+	fmt.Printf("PersonalQuestionPage-req=%+v\n", req)
 	resp, err := qc.QuestionService.PersonalQuestionPage(ctx, req)
 	if err != nil {
 		controller.HandleResponse(ctx, constants.InternalErrCode, constants.InternalErrMsg, nil)
@@ -137,18 +120,17 @@ func (qc *QuestionController) PersonalQuestionPage(ctx *gin.Context) {
 
 }
 
-//
-//func (qc *QuestionController) PersonalCollectionPage(ctx *gin.Context) {
-//	req := &types.PersonalCollectionPageReq{}
-//	if !controller.BindAndCheckParams(ctx, req) {
-//		return
-//	}
-//
-//	req.UserID = utils.GetUidFromTokenByCtx(ctx)
-//	resp, err := qc.QuestionService.PersonalCollectionPage(ctx, req)
-//	if err != nil {
-//		controller.HandleResponse(ctx, constants.InternalErrCode, constants.InternalErrMsg, nil)
-//		return
-//	}
-//	controller.HandleResponse(ctx, constants.SuccessCode, constants.Success, resp)
-//}
+func (qc *QuestionController) PersonalCollectionPage(ctx *gin.Context) {
+	req := &types.PersonalCollectionPageReq{}
+	if !controller.BindAndCheckParams(ctx, req) {
+		return
+	}
+
+	req.UserID, _ = utils.GetUidFromTokenByCtx(ctx)
+	resp, err := qc.QuestionService.PersonalCollectionPage(ctx, req)
+	if err != nil {
+		controller.HandleResponse(ctx, constants.InternalErrCode, constants.InternalErrMsg, nil)
+		return
+	}
+	controller.HandleResponse(ctx, constants.SuccessCode, constants.Success, resp)
+}

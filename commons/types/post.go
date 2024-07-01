@@ -49,10 +49,10 @@ type QuestionAdd struct {
 	HTML string `json:"-"`
 	// user id
 	UserID       string `json:"-"`
-	CopyRight    int    `validate:"required" json:"copyright"`
-	AllowReprint int    `validate:"required " json:"allow_reprint"`
-	AllowComment int    `validate:"required" json:"allow_comment"`
-	Feeds        int    `validate:"required " json:"feeds"`
+	CopyRight    string `validate:"required" json:"copyright"`
+	AllowReprint string `validate:"required " json:"allow_reprint"`
+	AllowComment string `validate:"required" json:"allow_comment"`
+	Feeds        string `validate:"required " json:"feeds"`
 	CaptchaID    string `json:"captcha_id"` // captcha_id
 	CaptchaCode  string `json:"captcha_code"`
 }
@@ -239,8 +239,8 @@ type UserQuestionInfo struct {
 // QuestionPageReq query questions page
 type QuestionPageReq struct {
 	Page      int    `validate:"omitempty,min=1" form:"page"`
-	PageSize  int    `validate:"omitempty,min=1" form:"page_size"`
-	OrderCond string `validate:"omitempty,oneof=newest active frequent score unanswered" form:"order"`
+	PageSize  int    `validate:"omitempty,min=1" form:"pageSize"`
+	OrderCond string `validate:"omitempty,oneof=newest active frequent score unanswered recommend" form:"cond"`
 	Tag       string `validate:"omitempty,gt=0,lte=100" form:"tag"`
 	Username  string `validate:"omitempty,gt=0,lte=100" form:"username"`
 	InDays    int    `validate:"omitempty,min=1" form:"in_days"`
@@ -274,11 +274,25 @@ type QuestionPageResp struct {
 	LastAnswerID       string    `json:"last_answer_id"`
 	LastAnsweredUserID string    `json:"-"`
 	LastAnsweredAt     time.Time `json:"-"`
+	//
+	AuthorID   string     `json:"authorID"`
+	AuthorInfo AuthorInfo `json:"authorInfo"`
+	//
+	Content string `json:"content"`
 
 	// operator information
-	OperatedAt    int64                     `json:"operated_at"`
-	Operator      *QuestionPageRespOperator `json:"operator"`
-	OperationType string                    `json:"operation_type"`
+	//OperatedAt    int64                     `json:"operated_at"`
+	//Operator      *QuestionPageRespOperator `json:"operator"`
+	//OperationType string                    `json:"operation_type"`
+
+}
+
+type AuthorInfo struct {
+	Username    string `json:"username"`
+	Avatar      string `json:"avatar"`
+	Rank        int    `json:"rank"`
+	DisplayName string `json:"display_name"`
+	Description string `json:"description"`
 }
 
 type QuestionPageRespOperator struct {
@@ -287,6 +301,7 @@ type QuestionPageRespOperator struct {
 	Rank        int    `json:"rank"`
 	DisplayName string `json:"display_name"`
 	Status      string `json:"status"`
+	Avatar      string `json:"avatar"`
 }
 
 type AdminQuestionPageReq struct {
@@ -319,8 +334,8 @@ type AdminUpdateQuestionStatusReq struct {
 
 type PersonalQuestionPageReq struct {
 	Page        int    `validate:"omitempty,min=1" form:"page"`
-	PageSize    int    `validate:"omitempty,min=1" form:"page_size"`
-	OrderCond   string `validate:"omitempty,oneof=newest active frequent score unanswered" form:"order"`
+	PageSize    int    `validate:"omitempty,min=1" form:"pageSize"`
+	OrderCond   string `validate:"omitempty,oneof=newest active frequent score unanswered" form:"cond"`
 	Username    string `validate:"omitempty,gt=0,lte=100" form:"username"`
 	LoginUserID string `json:"-"`
 }
@@ -328,18 +343,17 @@ type PersonalQuestionPageReq struct {
 type PersonalAnswerPageReq struct {
 	Page        int    `validate:"omitempty,min=1" form:"page"`
 	PageSize    int    `validate:"omitempty,min=1" form:"page_size"`
-	OrderCond   string `validate:"omitempty,oneof=newest active frequent score unanswered" form:"order"`
+	OrderCond   string `validate:"omitempty,oneof=newest active frequent score unanswered" form:"cond"`
 	Username    string `validate:"omitempty,gt=0,lte=100" form:"username"`
 	LoginUserID string `json:"-"`
 }
 
 type PersonalCollectionPageReq struct {
 	Page     int    `validate:"omitempty,min=1" form:"page"`
-	PageSize int    `validate:"omitempty,min=1" form:"page_size"`
+	PageSize int    `validate:"omitempty,min=1" form:"pageSize"`
 	UserID   string `json:"-"`
 }
 
-// Question question
 type Question struct {
 	ID               string    `xorm:"not null pk BIGINT(20) id"`
 	CreatedAt        time.Time `xorm:"not null default CURRENT_TIMESTAMP TIMESTAMP created_at"`
@@ -372,22 +386,4 @@ type Question struct {
 // TableName question table name
 func (Question) TableName() string {
 	return "question"
-}
-
-// QuestionWithTagsRevision question
-type QuestionWithTagsRevision struct {
-	Question
-	Tags []*TagSimpleInfoForRevision `json:"tags"`
-}
-
-// TagSimpleInfoForRevision tag simple info for revision
-type TagSimpleInfoForRevision struct {
-	ID              string `xorm:"not null pk comment('tag_id') BIGINT(20) id"`
-	MainTagID       int64  `xorm:"not null default 0 BIGINT(20) main_tag_id"`
-	MainTagSlugName string `xorm:"not null default '' VARCHAR(35) main_tag_slug_name"`
-	SlugName        string `xorm:"not null default '' unique VARCHAR(35) slug_name"`
-	DisplayName     string `xorm:"not null default '' VARCHAR(35) display_name"`
-	Recommend       bool   `xorm:"not null default false BOOL recommend"`
-	Reserved        bool   `xorm:"not null default false BOOL reserved"`
-	RevisionID      string `xorm:"not null default 0 BIGINT(20) revision_id"`
 }

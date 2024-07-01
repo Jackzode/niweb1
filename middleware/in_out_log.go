@@ -11,7 +11,7 @@ func InOutLog() gin.HandlerFunc {
 		fmt.Println(ctx.FullPath())
 		//next step
 		ctx.Next()
-		fmt.Println(ctx.Request.RequestURI)
+		//fmt.Println(ctx.Request.RequestURI)
 		//out log
 	}
 }

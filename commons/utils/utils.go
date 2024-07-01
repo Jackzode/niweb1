@@ -11,10 +11,20 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 	"regexp"
-	"strings"
+	"strconv"
 	"time"
 	"unicode"
 )
+
+func Str2Int(str string) int {
+	i, _ := strconv.Atoi(str)
+	return i
+}
+
+func Str2Int64(str string) int64 {
+	i, _ := strconv.ParseInt(str, 10, 64)
+	return i
+}
 
 func EncryptPassword(Pass string) (string, error) {
 	hashPwd, err := bcrypt.GenerateFromPassword([]byte(Pass), bcrypt.DefaultCost)
@@ -92,13 +102,22 @@ func CreateToken(UserName, Uid string, Role int) (string, error) {
 	return token.SignedString(secret)
 }
 
-func GetUidFromTokenByCtx(ctx *gin.Context) string {
+func GetUidFromTokenByCtx(ctx *gin.Context) (uid string, err error) {
 	v, ok := ctx.Get(constants.TokenClaim)
 	if !ok {
-		return ""
+		token := ctx.Request.Header.Get(constants.HeaderToken)
+		if token == "" {
+			return "", TokenMalformed
+		}
+		// parseToken 解析token包含的信息
+		claims, err := ParseToken(token)
+		if err != nil {
+			return "", TokenInvalid
+		}
+		return claims.Uid, nil
 	}
 	claim := v.(*CustomClaim)
-	return claim.Uid
+	return claim.Uid, nil
 }
 
 func IsChinese(str string) bool {
@@ -154,14 +173,6 @@ func JsonObj2String(data interface{}) string {
 
 func FromJsonString2Obj(data string, obj interface{}) error {
 	return json.Unmarshal([]byte(data), obj)
-}
-
-func ExtractToken(ctx *gin.Context) (token string) {
-	token = ctx.GetHeader("Authorization")
-	if len(token) == 0 {
-		token = ctx.Query("Authorization")
-	}
-	return strings.TrimPrefix(token, "lawyer-")
 }
 
 func GetLang(ctx *gin.Context) string {

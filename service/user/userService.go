@@ -140,6 +140,7 @@ func (us *UserService) FormatUserBasicInfo(ctx context.Context, userInfo *types.
 	userBasicInfo.Website = userInfo.Website
 	userBasicInfo.CityId = userInfo.CityId
 	userBasicInfo.Avatar = userInfo.Avatar
+	userBasicInfo.Description = userInfo.Description
 	userBasicInfo.Status = utils.ConvertUserStatus(userInfo.Status, userInfo.MailStatus)
 	if userBasicInfo.Status == constants.UserDeleted {
 		userBasicInfo.Avatar = ""

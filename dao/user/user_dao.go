@@ -2,8 +2,8 @@ package user
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/Jackzode/painting/commons/constants"
 	"github.com/Jackzode/painting/commons/handler"
 	glog "github.com/Jackzode/painting/commons/logger"
@@ -175,11 +175,19 @@ func (ur *UserDao) CheckUsernameValid(ctx context.Context, username string) bool
 
 func (ur *UserDao) CheckEmailValid(ctx context.Context, email string) bool {
 	res := ur.Cache.SetNX(ctx, email, 1, 0)
-	fmt.Println("setnx---", res.Err(), res.Val())
+	//fmt.Println("setnx---", res.Err(), res.Val())
 	if res.Err() != nil {
 		glog.Slog.Error(res.Err().Error())
 	}
 	return res.Val()
+}
+
+func (ur *UserDao) CheckEmailExist(ctx context.Context, email string) bool {
+	res := ur.Cache.Get(ctx, email)
+	if res.Val() == "" || len(res.Val()) == 0 {
+		return false
+	}
+	return true
 }
 
 func (ur *UserDao) GetUserInfoByUsername(ctx context.Context, username string) (userInfo *types.User, exist bool, err error) {
@@ -238,6 +246,21 @@ func (ur *UserDao) SearchUserListByName(ctx context.Context, name string, limit 
 	//todo
 	//tryToDecorateUserListFromUserCenter(ctx, ur.DB, userList)
 	return
+}
+
+func (ur *UserDao) GetCodeContent(ctx context.Context, code string) (info *types.EmailCodeContent, err error) {
+	get := ur.Cache.Get(ctx, code)
+	if get.Err() != nil {
+		glog.Slog.Error(get.Err().Error())
+		return nil, get.Err()
+	}
+	info = &types.EmailCodeContent{}
+	err = json.Unmarshal([]byte(get.Val()), info)
+	if err != nil {
+		glog.Slog.Error(err.Error())
+		return nil, err
+	}
+	return info, nil
 }
 
 /*func tryToDecorateUserInfoFromUserCenter(ctx context.Context, db *xorm.Engine, original *types.User) (err error) {

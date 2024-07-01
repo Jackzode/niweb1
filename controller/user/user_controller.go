@@ -32,13 +32,7 @@ func (uc *UserController) UserRegisterByEmail(ctx *gin.Context) {
 		return
 	}
 	req.IP = ctx.ClientIP()
-	//对比验证码是否正确
-	//captchaPass, err := captcha.VerifyCaptcha(ctx, req.CaptchaID, req.CaptchaCode)
-	//fmt.Println(captchaPass, err)
-	//if err != nil || !captchaPass {
-	//	controller.HandleResponse(ctx, constants.CaptchaFailedCode, constants.CaptchaVerificationFailed, nil)
-	//	return
-	//}
+
 	//核心逻辑
 	resp, err := uc.userService.UserRegisterByEmail(ctx, req)
 	if err != nil {
@@ -69,7 +63,7 @@ func (uc *UserController) UserEmailLogin(ctx *gin.Context) {
 
 func (uc *UserController) GetUserInfoByUserID(ctx *gin.Context) {
 
-	uid := utils.GetUidFromTokenByCtx(ctx)
+	uid, _ := utils.GetUidFromTokenByCtx(ctx)
 	userInfo, err := uc.userService.GetUserInfoByUserID(ctx, uid)
 	if err != nil {
 		glog.Slog.Error(err)
@@ -165,7 +159,7 @@ func (uc *UserController) UserVerifyEmailSend(ctx *gin.Context) {
 	if !controller.BindAndCheckParams(ctx, req) {
 		return
 	}
-	uid := utils.GetUidFromTokenByCtx(ctx)
+	uid, _ := utils.GetUidFromTokenByCtx(ctx)
 	captchaPass, err := captcha.VerifyCaptcha(ctx, req.Code, req.Content)
 	if err != nil || !captchaPass {
 		controller.HandleResponse(ctx, constants.CaptchaFailedCode, constants.CaptchaVerificationFailed, nil)
@@ -181,11 +175,11 @@ func (uc *UserController) UserVerifyEmailSend(ctx *gin.Context) {
 
 func (uc *UserController) UserModifyPassWord(ctx *gin.Context) {
 	req := &types.UserModifyPasswordReq{}
-	fmt.Println("req ", req)
+	//fmt.Println("req ", req)
 	if !controller.BindAndCheckParams(ctx, req) {
 		return
 	}
-	uid := utils.GetUidFromTokenByCtx(ctx)
+	uid, _ := utils.GetUidFromTokenByCtx(ctx)
 	req.UserID = uid
 	//校对验证码
 	captchaPass, err := captcha.VerifyCaptcha(ctx, req.CaptchaID, req.CaptchaCode)
@@ -219,9 +213,9 @@ func (uc *UserController) UpdateUserInfo(ctx *gin.Context) {
 	if !controller.BindAndCheckParams(ctx, req) {
 		return
 	}
-	fmt.Printf("req: %+v \n", *req)
+	//fmt.Printf("req: %+v \n", *req)
 	//从token里获取用户信息
-	req.UserID = utils.GetUidFromTokenByCtx(ctx)
+	req.UserID, _ = utils.GetUidFromTokenByCtx(ctx)
 	err := uc.userService.UpdateInfo(ctx, req)
 	if err != nil {
 		controller.HandleResponse(ctx, constants.InternalErrCode, constants.EmailOrPasswordWrong, nil)
@@ -309,7 +303,7 @@ func (uc *UserController) UserChangeEmailSendCode(ctx *gin.Context) {
 	if !controller.BindAndCheckParams(ctx, req) {
 		return
 	}
-	req.UserID = utils.GetUidFromTokenByCtx(ctx)
+	req.UserID, _ = utils.GetUidFromTokenByCtx(ctx)
 	// If the user is not logged in, the api cannot be used.
 	// If the user email is not verified, that also can use this api to modify the email.
 	if len(req.UserID) == 0 {
@@ -386,7 +380,7 @@ func (uc *UserController) SearchUserListByName(ctx *gin.Context) {
 
 func (uc *UserController) UploadAvatar(ctx *gin.Context) {
 
-	UserID := utils.GetUidFromTokenByCtx(ctx)
+	UserID, _ := utils.GetUidFromTokenByCtx(ctx)
 	if UserID == "" {
 		controller.HandleResponse(ctx, constants.ParamInvalid, constants.UserTokenInvalid, nil)
 		return
@@ -432,6 +426,23 @@ func (uc *UserController) UploadAvatar(ctx *gin.Context) {
 		return
 	}
 	resp := map[string]string{"image_url": url}
-	fmt.Println("resp=", resp)
+	//fmt.Println("resp=", resp)
 	controller.HandleResponse(ctx, constants.SuccessCode, constants.Success, resp)
+}
+
+func (uc *UserController) GetCaptchaCode(ctx *gin.Context) {
+
+	email := ctx.Query("email")
+	//fmt.Println("email---", email)
+	if email == "" {
+		controller.HandleResponse(ctx, constants.ParamInvalid, constants.ParamErr, nil)
+		return
+	}
+	err := uc.userService.SendCaptchaCode(ctx, email)
+	if err != nil {
+		glog.Slog.Error(err.Error())
+		controller.HandleResponse(ctx, constants.CaptchaFailedCode, constants.CaptchaVerificationFailed, nil)
+		return
+	}
+	controller.HandleResponse(ctx, constants.SuccessCode, constants.Success, nil)
 }

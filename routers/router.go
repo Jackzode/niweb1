@@ -23,6 +23,12 @@ func NewHTTPServer(debug bool) *gin.Engine {
 
 	InitPostRoutes(group)
 
+	InitLikePostRoutes(group)
+
+	InitCollectionRoutes(group)
+
+	InitCommentRoutes(group)
+
 	return r
 }
 

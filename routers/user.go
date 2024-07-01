@@ -12,9 +12,10 @@ func InitUserRoutes(r *gin.RouterGroup) {
 	userController := controller.NewUserController()
 	g.POST("/registerByEmail", userController.UserRegisterByEmail)
 	g.GET("/email/verification", userController.UserVerifyEmail)
-	g.GET("/captcha", userController.UserRegisterCaptcha)
+	g.GET("/getCaptcha", userController.UserRegisterCaptcha)
 	g.POST("/login", userController.UserEmailLogin)
 	g.GET("/getOtherProfile", userController.GetOtherUserInfoByUsername)
+	g.GET("/getCaptchaCode", userController.GetCaptchaCode)
 
 	//need login
 	auth := g.Group("/personal", middleware.AccessToken())

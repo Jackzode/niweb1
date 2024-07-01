@@ -304,8 +304,8 @@ func (qr *PostDao) SitemapQuestions(ctx context.Context, page, pageSize int) (
 // GetQuestionPage query question page
 func (qr *PostDao) GetQuestionPage(ctx context.Context, page, pageSize int, userID, tagID, orderCond string, inDays int) (
 	questionList []*types.Question, total int64, err error) {
-	questionList = make([]*types.Question, 0)
 
+	questionList = make([]*types.Question, 0)
 	session := qr.DB.Context(ctx).Where("question.status = ? OR question.status = ?",
 		constants.QuestionStatusAvailable, constants.QuestionStatusClosed)
 	if len(tagID) > 0 {
@@ -322,10 +322,11 @@ func (qr *PostDao) GetQuestionPage(ctx context.Context, page, pageSize int, user
 	if inDays > 0 {
 		session.And("question.created_at > ?", time.Now().AddDate(0, 0, -inDays))
 	}
-
 	switch orderCond {
 	case "newest":
-		session.OrderBy("question.pin desc,question.created_at DESC")
+		session.OrderBy("question.created_at DESC")
+	case "recommend":
+		session.OrderBy("question.pin desc ")
 	case "active":
 		session.OrderBy("question.pin desc,question.post_update_time DESC, question.updated_at DESC")
 	case "frequent":
@@ -341,6 +342,7 @@ func (qr *PostDao) GetQuestionPage(ctx context.Context, page, pageSize int, user
 	for _, item := range questionList {
 		item.ID = utils.EnShortID(item.ID)
 	}
+	//fmt.Println("len(questionList)=", len(questionList), "total=", total)
 	return questionList, total, err
 }
 

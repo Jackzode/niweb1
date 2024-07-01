@@ -5,6 +5,16 @@ import (
 )
 
 const (
+	CommentEditDeadline    = time.Minute * 5
+	CommentStatusAvailable = 1
+	CommentStatusDeleted   = 10
+)
+const (
+	CGDefault                   = 1
+	CGDIY                       = 2
+	DefaultPageSize             = 20
+	Like                        = 1
+	Dislike                     = 0
 	StatusErrCode               = 10002
 	CaptchaFailedCode           = 10001
 	ParamInvalid                = 10000

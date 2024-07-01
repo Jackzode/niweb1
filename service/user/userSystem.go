@@ -214,8 +214,14 @@ func (us *UserService) UserUpdateInterface(ctx context.Context, lang, uid string
 
 // UserRegisterByEmail user register
 func (us *UserService) UserRegisterByEmail(ctx context.Context, req *types.UserRegisterReq) (resp *types.UserLoginResp, err error) {
-	//先查一下数据库是否有这个邮箱地址，有则是重复注册
-	//_, has, err := us.userDao.GetUserInfoByEmailFromDB(ctx, req.Email)
+	//验证邮箱和验证码
+	emailInfoFromVerifyCode, err := us.userDao.GetCodeContent(ctx, req.CaptchaCode)
+	if err != nil {
+		return nil, err
+	}
+	if emailInfoFromVerifyCode.Email != req.Email {
+		return nil, errors.New(constants.EmailDuplicate)
+	}
 	valid := us.userDao.CheckEmailValid(ctx, req.Email)
 	//邮箱重复了
 	if !valid {
@@ -244,16 +250,6 @@ func (us *UserService) UserRegisterByEmail(ctx context.Context, req *types.UserR
 		glog.Slog.Error(err.Error())
 		return nil, err
 	}
-
-	// send email
-	data := &types.EmailCodeContent{
-		Email:  req.Email,
-		UserID: userInfo.ID,
-	}
-	code := uuid.NewString()
-	go captcha.SetCode(ctx, code, utils.JsonObj2String(data), constants.CaptchaExpiration)
-	body := fmt.Sprintf("http://localhost:8081/email/verification?code=%s", code)
-	go handler.EmailHandler.Send(userInfo.EMail, constants.TitleRegisterByEmail, body)
 
 	// return user info and token
 	resp = &types.UserLoginResp{}
@@ -440,5 +436,25 @@ func (us *UserService) Upload2OSS(filekey string, file io.Reader) (err error) {
 	// 上传文件。
 	err = bucket.PutObject(filekey, file)
 	return err
+}
 
+func (us *UserService) SendCaptchaCode(ctx context.Context, email string) error {
+	// send email
+	exist := us.userDao.CheckEmailExist(ctx, email)
+	if exist {
+		//fmt.Println("ex--", exist)
+		return errors.New(constants.EmailDuplicate)
+	}
+	data := &types.EmailCodeContent{
+		Email: email,
+	}
+	code := uuid.NewString()
+	code = code[:4]
+	go captcha.SetCode(ctx, code, utils.JsonObj2String(data), constants.CaptchaExpiration)
+	body := fmt.Sprintf("code=%s", code)
+	err := handler.EmailHandler.Send(email, constants.TitleRegisterByEmail, body)
+	if err != nil {
+		glog.Slog.Error(err.Error())
+	}
+	return err
 }
